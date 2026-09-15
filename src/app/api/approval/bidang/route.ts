@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
+export const dynamic = 'force-dynamic';
+
 // GET: Mengambil daftar permohonan perubahan bidang pegawai (status: PENDING / ALL)
 export async function GET() {
   try {
