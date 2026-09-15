@@ -18,41 +18,43 @@ export async function GET(req: Request) {
       where.bidangId = bidangId;
     }
 
-    const data = await prisma.suratTugas.findMany({
+    const data = await prisma.suratMasuk.findMany({
       where,
-      include: { bidang: true },
+      include: {
+        bidang: true
+      },
       orderBy: { createdAt: 'desc' }
     });
     return NextResponse.json(data);
   } catch (error) {
-    console.error('Failed to fetch surat tugas:', error);
-    return NextResponse.json({ error: 'Failed to fetch surat tugas' }, { status: 500 });
+    console.error('Failed to fetch Surat Masuk:', error);
+    return NextResponse.json({ error: 'Failed to fetch Surat Masuk' }, { status: 500 });
   }
 }
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const created = await prisma.suratTugas.create({
+    const created = await prisma.suratMasuk.create({
       data: {
         tahun: body.tahun || new Date().getFullYear().toString(),
-        bidangId: body.bidangId || null,
-        noS: body.noS || null,
-        noST: body.noST || null,
-        tujuan: body.tujuan || '',
+        noSuratMasuk: body.noSuratMasuk || '',
+        tanggalSuratMasuk: body.tanggalSuratMasuk || null,
+        instansiPengirim: body.instansiPengirim || '',
         perihal: body.perihal || '',
-        tanggalSurat: body.tanggalSurat || null,
-        tglMulai: body.tglMulai || null,
-        tglSelesai: body.tglSelesai || null,
-        suratDiterimaSekretaris: body.suratDiterimaSekretaris || null,
-        linkDrive: body.linkDrive || null
+        tanggalDiterimaSekbid: body.tanggalDiterimaSekbid || null,
+        tanggalDikirimKeSekper: body.tanggalDikirimKeSekper || null,
+        linkDrive: body.linkDrive || null,
+        bidangId: body.bidangId || null
       },
-      include: { bidang: true }
+      include: {
+        bidang: true
+      }
     });
     return NextResponse.json(created, { status: 201 });
   } catch (error) {
-    console.error('Failed to create surat tugas:', error);
-    return NextResponse.json({ error: 'Failed to create surat tugas' }, { status: 500 });
+    console.error('Failed to create Surat Masuk:', error);
+    return NextResponse.json({ error: 'Failed to create Surat Masuk' }, { status: 500 });
   }
 }
 
@@ -62,27 +64,29 @@ export async function PUT(req: Request) {
     if (!body.id) {
       return NextResponse.json({ error: 'ID is required' }, { status: 400 });
     }
-    const updated = await prisma.suratTugas.update({
+
+    const updated = await prisma.suratMasuk.update({
       where: { id: body.id },
       data: {
         tahun: body.tahun,
-        bidangId: body.bidangId !== undefined ? body.bidangId || null : undefined,
-        noS: body.noS,
-        noST: body.noST,
-        tujuan: body.tujuan,
+        noSuratMasuk: body.noSuratMasuk,
+        tanggalSuratMasuk: body.tanggalSuratMasuk,
+        instansiPengirim: body.instansiPengirim,
         perihal: body.perihal,
-        tanggalSurat: body.tanggalSurat,
-        tglMulai: body.tglMulai,
-        tglSelesai: body.tglSelesai,
-        suratDiterimaSekretaris: body.suratDiterimaSekretaris,
-        linkDrive: body.linkDrive
+        tanggalDiterimaSekbid: body.tanggalDiterimaSekbid,
+        tanggalDikirimKeSekper: body.tanggalDikirimKeSekper,
+        linkDrive: body.linkDrive,
+        bidangId: body.bidangId !== undefined ? body.bidangId || null : undefined
       },
-      include: { bidang: true }
+      include: {
+        bidang: true
+      }
     });
+
     return NextResponse.json(updated);
   } catch (error) {
-    console.error('Failed to update surat tugas:', error);
-    return NextResponse.json({ error: 'Failed to update surat tugas' }, { status: 500 });
+    console.error('Failed to update Surat Masuk:', error);
+    return NextResponse.json({ error: 'Failed to update Surat Masuk' }, { status: 500 });
   }
 }
 
@@ -93,12 +97,12 @@ export async function DELETE(req: Request) {
     if (!id) {
       return NextResponse.json({ error: 'ID is required' }, { status: 400 });
     }
-    await prisma.suratTugas.delete({
+    await prisma.suratMasuk.delete({
       where: { id }
     });
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Failed to delete surat tugas:', error);
-    return NextResponse.json({ error: 'Failed to delete surat tugas' }, { status: 500 });
+    console.error('Failed to delete Surat Masuk:', error);
+    return NextResponse.json({ error: 'Failed to delete Surat Masuk' }, { status: 500 });
   }
 }

@@ -39,10 +39,11 @@ export const LhpTable: React.FC<LhpTableProps> = ({
           <thead>
             <tr className="border-b border-slate-800 bg-slate-900/90 text-[11px] font-bold tracking-wider text-slate-400 uppercase">
               <th className="px-4 py-3.5 w-16 text-center">Tahun</th>
-              <th className="px-4 py-3.5 w-56">Nomor S & LHP</th>
-              <th className="px-4 py-3.5 w-44">Tgl LHP</th>
+              <th className="px-4 py-3.5 w-52">Nomor S & LHP</th>
+              <th className="px-4 py-3.5 w-44">Bidang Kerja</th>
+              <th className="px-4 py-3.5 w-36">Tgl LHP</th>
               <th className="px-4 py-3.5">Tujuan & Ringkasan LHP</th>
-              <th className="px-4 py-3.5 w-52">Diterima & Dokumen Drive</th>
+              <th className="px-4 py-3.5 w-48">Diterima & Dokumen Drive</th>
               <th className="px-4 py-3.5 text-right w-28">Aksi</th>
             </tr>
           </thead>
@@ -83,6 +84,17 @@ export const LhpTable: React.FC<LhpTableProps> = ({
                       )}
                     </div>
                   </div>
+                </td>
+
+                {/* Bidang Kerja */}
+                <td className="px-4 py-4">
+                  <span className="text-slate-300 font-medium">
+                    {item.bidang?.nama ? (
+                      item.bidang.singkatan ? `${item.bidang.nama} (${item.bidang.singkatan})` : item.bidang.nama
+                    ) : (
+                      <span className="text-slate-500 italic">Belum Ditentukan</span>
+                    )}
+                  </span>
                 </td>
 
                 {/* Tanggal LHP */}

@@ -6,10 +6,12 @@ import {
   SparklesIcon,
   TagIcon,
   UserIcon,
+  BuildingOffice2Icon,
   ChatBubbleBottomCenterTextIcon
 } from '@heroicons/react/24/outline';
 import { Modal } from '@/components/common';
 import { KakItem, KakStatus, KakStatusHistoryItem, formatTanggalLengkap } from '@/lib/suratData';
+import { useUserBidang } from '@/lib/useUserBidang';
 
 interface KakFormModalProps {
   isOpen: boolean;
@@ -43,15 +45,21 @@ export const KakFormModal: React.FC<KakFormModalProps> = ({
   onSave,
   editItem
 }) => {
+  const userBidang = useUserBidang();
+  const isAdmin = userBidang.userRole === 'ADMIN';
+  const [bidangOptions, setBidangOptions] = useState<Array<{ id: string; nama: string; singkatan?: string | null }>>([]);
+
   const [inputTahun, setInputTahun] = useState(new Date().getFullYear().toString());
   const [statusCatatan, setStatusCatatan] = useState('');
   const [formData, setFormData] = useState<{
+    bidangId: string;
     tujuan: string;
     perihal: string;
     diberikanOleh: string;
     status: KakStatus;
     linkDrive: string;
   }>({
+    bidangId: '',
     tujuan: '',
     perihal: '',
     diberikanOleh: '',
@@ -60,10 +68,22 @@ export const KakFormModal: React.FC<KakFormModalProps> = ({
   });
 
   useEffect(() => {
+    if (isAdmin) {
+      fetch('/api/bidang')
+        .then((res) => (res.ok ? res.json() : []))
+        .then((data) => {
+          if (Array.isArray(data)) setBidangOptions(data);
+        })
+        .catch((err) => console.error('Error fetching bidang options:', err));
+    }
+  }, [isAdmin]);
+
+  useEffect(() => {
     if (editItem) {
       setInputTahun(editItem.tahun || new Date().getFullYear().toString());
       setStatusCatatan('');
       setFormData({
+        bidangId: editItem.bidangId || (editItem.bidang?.id ?? (userBidang.bidangId || '')),
         tujuan: editItem.tujuan || '',
         perihal: editItem.perihal || '',
         diberikanOleh: editItem.diberikanOleh || '',
@@ -74,6 +94,7 @@ export const KakFormModal: React.FC<KakFormModalProps> = ({
       setInputTahun(new Date().getFullYear().toString());
       setStatusCatatan('');
       setFormData({
+        bidangId: userBidang.bidangId || '',
         tujuan: '',
         perihal: '',
         diberikanOleh: '',
@@ -81,7 +102,7 @@ export const KakFormModal: React.FC<KakFormModalProps> = ({
         linkDrive: ''
       });
     }
-  }, [editItem, isOpen]);
+  }, [editItem, isOpen, userBidang.bidangId]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -112,6 +133,7 @@ export const KakFormModal: React.FC<KakFormModalProps> = ({
 
     const itemData: Omit<KakItem, 'id'> = {
       tahun: inputTahun || new Date().getFullYear().toString(),
+      bidangId: formData.bidangId || null,
       tujuan: formData.tujuan.trim(),
       perihal: formData.perihal.trim(),
       diberikanOleh: formData.diberikanOleh.trim(),
@@ -142,13 +164,13 @@ export const KakFormModal: React.FC<KakFormModalProps> = ({
             </label>
             <input
               type="number"
-              min="2000"
+              min="1900"
               max="2099"
               required
               value={inputTahun}
               onChange={(e) => setInputTahun(e.target.value)}
               className="w-full px-3.5 py-2.5 bg-slate-950/80 border border-slate-800 rounded-xl text-xs sm:text-sm text-white focus:outline-none focus:border-amber-400"
-              placeholder="Contoh: 2026"
+              placeholder={`Contoh: ${new Date().getFullYear()}`}
             />
           </div>
 
@@ -169,6 +191,45 @@ export const KakFormModal: React.FC<KakFormModalProps> = ({
               ))}
             </select>
           </div>
+        </div>
+
+        {/* Bidang Kerja */}
+        <div>
+          <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center justify-between">
+            <span className="flex items-center gap-1.5">
+              <BuildingOffice2Icon className="w-3.5 h-3.5 text-amber-400" />
+              <span>Bidang Kerja</span>
+            </span>
+            <span className="text-[10px] text-amber-400/90 font-mono bg-amber-400/10 px-1.5 py-0.5 rounded border border-amber-400/20">
+              {isAdmin ? 'Pilihan Administrator' : 'Otomatis sesuai akun'}
+            </span>
+          </label>
+          {isAdmin ? (
+            <select
+              value={formData.bidangId}
+              onChange={(e) => setFormData({ ...formData, bidangId: e.target.value })}
+              className="w-full px-3.5 py-2.5 bg-slate-950/80 border border-slate-800 rounded-xl text-xs sm:text-sm text-white focus:outline-none focus:border-amber-400 cursor-pointer"
+            >
+              <option value="">-- Pilih Bidang Kerja --</option>
+              {bidangOptions.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.singkatan ? `${b.nama} (${b.singkatan})` : b.nama}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <div className="w-full px-3.5 py-2.5 bg-slate-900/90 border border-slate-800 rounded-xl text-xs sm:text-sm text-slate-300 flex items-center justify-between cursor-not-allowed select-none">
+              <span className="font-medium text-white">
+                {editItem?.bidang?.nama || userBidang.bidangNama || (userBidang.isLoading ? 'Memuat bidang...' : 'Belum Ditentukan')}
+              </span>
+              {(editItem?.bidang?.singkatan || userBidang.bidangSingkatan) && (
+                <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20 font-mono">
+                  {editItem?.bidang?.singkatan || userBidang.bidangSingkatan}
+                </span>
+              )}
+            </div>
+          )}
+          <input type="hidden" name="bidangId" value={formData.bidangId} />
         </div>
 
         {/* Diberikan Oleh ke Sekbid */}

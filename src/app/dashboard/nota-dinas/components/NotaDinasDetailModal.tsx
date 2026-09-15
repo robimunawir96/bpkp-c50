@@ -3,7 +3,8 @@
 import React from 'react';
 import {
   CalendarDaysIcon,
-  UserCircleIcon
+  UserCircleIcon,
+  BuildingOffice2Icon
 } from '@heroicons/react/24/outline';
 import { Modal } from '@/components/common';
 import { NotaDinasItem } from '@/lib/suratData';
@@ -31,16 +32,31 @@ export const NotaDinasDetailModal: React.FC<NotaDinasDetailModalProps> = ({
   return (
     <Modal isOpen={!!item} onClose={onClose} title={modalTitle} maxWidth="lg">
       <div className="space-y-4">
-        {/* Nomor ND */}
-        <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 text-xs">
-          <span className="text-slate-400 block mb-1">Nomor Nota Dinas:</span>
-          {item.noND ? (
-            <span className="font-mono font-bold text-emerald-400 bg-emerald-400/10 px-2.5 py-1 rounded border border-emerald-400/20 inline-block">
-              {item.noND}
-            </span>
-          ) : (
-            <span className="text-slate-500 italic font-mono">-</span>
-          )}
+        {/* Nomor ND & Bidang */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+          <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800">
+            <span className="text-slate-400 block mb-1">Nomor Nota Dinas:</span>
+            {item.noND ? (
+              <span className="font-mono font-bold text-emerald-400 bg-emerald-400/10 px-2.5 py-1 rounded border border-emerald-400/20 inline-block">
+                {item.noND}
+              </span>
+            ) : (
+              <span className="text-slate-500 italic font-mono">-</span>
+            )}
+          </div>
+          <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800">
+            <span className="text-slate-400 block mb-1">Bidang Kerja:</span>
+            <div className="flex items-center gap-1.5 text-white font-semibold">
+              <BuildingOffice2Icon className="w-4 h-4 text-amber-400 shrink-0" />
+              <span className="truncate">
+                {item.bidang?.nama
+                  ? item.bidang.singkatan
+                    ? `${item.bidang.nama} (${item.bidang.singkatan})`
+                    : item.bidang.nama
+                  : '-'}
+              </span>
+            </div>
+          </div>
         </div>
 
         {/* Tanggal & Pemohon */}

@@ -1,8 +1,16 @@
+export interface BidangRef {
+  id: string;
+  nama: string;
+  singkatan?: string | null;
+}
+
 export interface SuratTugasItem {
   id: string;
   tahun: string;
   noS?: string;
   noST?: string;
+  bidangId?: string | null;
+  bidang?: BidangRef | null;
   tujuan: string;
   perihal: string;
   tanggalSurat?: string;
@@ -10,15 +18,21 @@ export interface SuratTugasItem {
   tglSelesai?: string;
   suratDiterimaSekretaris?: string;
   linkDrive?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface NotaDinasItem {
   id: string;
   tahun: string;
   noND?: string;
+  bidangId?: string | null;
+  bidang?: BidangRef | null;
   yangMeminta: string;
   tanggalND?: string;
   perihal?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface LhpItem {
@@ -26,11 +40,15 @@ export interface LhpItem {
   tahun: string;
   noS?: string;
   noLHP?: string;
+  bidangId?: string | null;
+  bidang?: BidangRef | null;
   tanggalLHP?: string;
   tujuan: string;
   perihal: string;
   tanggalDiterimaSekretaris?: string;
   linkDrive?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface SuratPengantarItem {
@@ -39,8 +57,12 @@ export interface SuratPengantarItem {
   tanggalDibuat?: string;
   noLHP?: string;
   noSP?: string;
+  bidangId?: string | null;
+  bidang?: BidangRef | null;
   tujuan: string; // Tujuan Penugasan
   linkDrive?: string; // Link Dokumen Google Drive
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export type KakStatus = 'Diterima Sekbid' | 'Dikirim ke Sekper' | 'Diberikan ke Tim';
@@ -51,17 +73,38 @@ export interface KakStatusHistoryItem {
   tanggal: string;
   keterangan?: string;
   diubahOleh?: string;
+  createdAt?: string;
 }
 
 export interface KakItem {
   id: string;
   tahun: string;
+  bidangId?: string | null;
+  bidang?: BidangRef | null;
   tujuan: string;
   perihal: string;
   diberikanOleh?: string;
   status: KakStatus;
   statusHistory?: KakStatusHistoryItem[];
   linkDrive?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface SuratMasukItem {
+  id: string;
+  tahun: string;
+  noSuratMasuk: string;
+  tanggalSuratMasuk?: string;
+  instansiPengirim: string;
+  perihal: string;
+  tanggalDiterimaSekbid?: string;
+  tanggalDikirimKeSekper?: string;
+  linkDrive?: string;
+  bidangId?: string | null;
+  bidang?: BidangRef | null;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export const INITIAL_SURAT_TUGAS: SuratTugasItem[] = [];
@@ -69,13 +112,15 @@ export const INITIAL_NOTA_DINAS: NotaDinasItem[] = [];
 export const INITIAL_LHP: LhpItem[] = [];
 export const INITIAL_SURAT_PENGANTAR: SuratPengantarItem[] = [];
 export const INITIAL_KAK: KakItem[] = [];
+export const INITIAL_SURAT_MASUK: SuratMasukItem[] = [];
 
 export const STORAGE_KEYS = {
   SURAT_TUGAS: 'bpkp_surat_tugas_data',
   NOTA_DINAS: 'bpkp_nota_dinas_data',
   LHP: 'bpkp_lhp_data',
   SURAT_PENGANTAR: 'bpkp_surat_pengantar_data',
-  KAK: 'bpkp_kak_data'
+  KAK: 'bpkp_kak_data',
+  SURAT_MASUK: 'bpkp_surat_masuk_data'
 };
 
 // Helper untuk format tanggal dari YYYY-MM-DD ke "DD Bulan YYYY"
@@ -128,3 +173,16 @@ export function parseDateToInputFormat(dateStr: string): string {
   }
   return '';
 }
+
+// Helper untuk konversi string tanggal (YYYY-MM-DD atau "DD Bulan YYYY") ke timestamp (ms) untuk sorting akurat
+export function parseDateToTimestamp(dateStr?: string | null): number {
+  if (!dateStr || dateStr === '-') return 0;
+  const isoStr = parseDateToInputFormat(dateStr);
+  if (isoStr) {
+    const time = new Date(isoStr).getTime();
+    if (!isNaN(time)) return time;
+  }
+  const directTime = new Date(dateStr).getTime();
+  return isNaN(directTime) ? 0 : directTime;
+}
+

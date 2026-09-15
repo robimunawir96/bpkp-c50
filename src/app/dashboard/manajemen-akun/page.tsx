@@ -22,11 +22,12 @@ import {
   AlertMessage,
   Modal,
   DeleteConfirmModal,
-  ActionButtons
+  ActionButtons,
+  TableFilterBar
 } from '@/components/common';
 import { useDataManager } from '@/lib/useDataManager';
 
-interface PegawaiItem {
+interface AccountItem {
   id: string;
   name: string;
   email: string;
@@ -67,21 +68,54 @@ interface ResetPasswordItem {
   createdAt: string;
 }
 
+interface BidangChangeItem {
+  id: string;
+  name: string;
+  email: string;
+  phoneNumber?: string;
+  currentBidang: string;
+  currentBidangSingkatan?: string | null;
+  currentBidangId?: string | null;
+  targetBidang: string;
+  targetBidangSingkatan?: string | null;
+  targetBidangId?: string | null;
+  role: 'ADMIN' | 'PEGAWAI';
+  updatedAt: string;
+}
+
 interface BidangOption {
   id: string;
   nama: string;
   singkatan?: string | null;
 }
 
-const defaultPegawai: PegawaiItem[] = [];
+const defaultAccounts: AccountItem[] = [];
 
-export default function PegawaiPage() {
-  // Main Tab State
-  const [activeTab, setActiveTab] = useState<'pegawai' | 'registrasi' | 'reset-password'>('pegawai');
+export default function ManajemenAkunPage() {
+  // Auth & Role checking
+  const [currentUser, setCurrentUser] = useState<{ role?: string; name?: string; email?: string } | null>(null);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
-  // --- TAB 1: PEGAWAI DATA ---
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('bpkp_auth_user');
+      if (stored) {
+        try {
+          setCurrentUser(JSON.parse(stored));
+        } catch (e) {
+          console.error(e);
+        }
+      }
+      setIsCheckingAuth(false);
+    }
+  }, []);
+
+  // Main Tab State: 'akun' | 'registrasi' | 'bidang' | 'reset-password'
+  const [activeTab, setActiveTab] = useState<'akun' | 'registrasi' | 'bidang' | 'reset-password'>('akun');
+
+  // --- TAB 1: DATA AKUN ---
   const {
-    data: pegawaiList,
+    data: accountList,
     searchQuery,
     setSearchQuery,
     isFormOpen,
@@ -99,17 +133,17 @@ export default function PegawaiPage() {
     closeDelete,
     saveItem,
     deleteItem,
-    refreshData: refreshPegawai
-  } = useDataManager<PegawaiItem>({
+    refreshData: refreshAccountList
+  } = useDataManager<AccountItem>({
     storageKey: 'bpkp_pegawai_data',
-    initialData: defaultPegawai,
+    initialData: defaultAccounts,
     apiEndpoint: '/api/pegawai',
     getItemTitle: (item) => item.name || item.email
   });
 
   const [bidangOptions, setBidangOptions] = useState<BidangOption[]>([]);
 
-  // Form State Pegawai
+  // Form State Akun
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -120,16 +154,17 @@ export default function PegawaiPage() {
     password: ''
   });
 
-  // --- TAB 2 & 3: APPROVAL STATES ---
+  // --- TAB 2, 3 & 4: APPROVAL STATES ---
   const [registrations, setRegistrations] = useState<RegistrationItem[]>([]);
   const [resetRequests, setResetRequests] = useState<ResetPasswordItem[]>([]);
+  const [bidangChanges, setBidangChanges] = useState<BidangChangeItem[]>([]);
   const [approvalStatusFilter, setApprovalStatusFilter] = useState<'PENDING' | 'ALL' | 'APPROVED' | 'REJECTED'>('PENDING');
   const [isApprovalLoading, setIsApprovalLoading] = useState(false);
 
   // Approval Confirm Modal
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
-    type: 'approve-reg' | 'reject-reg' | 'approve-reset' | 'reject-reset';
+    type: 'approve-reg' | 'reject-reg' | 'approve-reset' | 'reject-reset' | 'approve-bidang' | 'reject-bidang';
     item: any;
     customPassword?: string;
     adminNotes?: string;
@@ -151,7 +186,7 @@ export default function PegawaiPage() {
       .catch((err) => console.error('Error fetching bidang:', err));
   }, []);
 
-  // Sync Form Data when Editing Pegawai
+  // Sync Form Data when Editing Akun
   useEffect(() => {
     if (editingItem) {
       setFormData({
@@ -208,14 +243,32 @@ export default function PegawaiPage() {
     }
   }, [approvalStatusFilter]);
 
+  // Fetch Bidang Change Requests
+  const fetchBidangChanges = useCallback(async () => {
+    setIsApprovalLoading(true);
+    try {
+      const res = await fetch('/api/approval/bidang');
+      if (res.ok) {
+        const data = await res.json();
+        setBidangChanges(Array.isArray(data) ? data : []);
+      }
+    } catch (err) {
+      console.error('Error fetching bidang change requests:', err);
+    } finally {
+      setIsApprovalLoading(false);
+    }
+  }, []);
+
   // Load Approval data on tab or filter change
   useEffect(() => {
     if (activeTab === 'registrasi') {
       fetchRegistrations();
+    } else if (activeTab === 'bidang') {
+      fetchBidangChanges();
     } else if (activeTab === 'reset-password') {
       fetchResetRequests();
     }
-  }, [activeTab, fetchRegistrations, fetchResetRequests]);
+  }, [activeTab, fetchRegistrations, fetchResetRequests, fetchBidangChanges]);
 
   // Pending counts
   const pendingRegCount = useMemo(() => {
@@ -226,14 +279,18 @@ export default function PegawaiPage() {
     return resetRequests.filter((r) => r.status === 'PENDING').length;
   }, [resetRequests]);
 
-  // Handle Pegawai Form Submit
+  const pendingBidangCount = useMemo(() => {
+    return bidangChanges.length;
+  }, [bidangChanges]);
+
+  // Handle Form Submit (Add / Edit Akun)
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name.trim() || !formData.email.trim()) return;
 
     const selectedBidang = bidangOptions.find((b) => b.id === formData.bidangId);
 
-    const payload: Omit<PegawaiItem, 'id'> & { password?: string; status?: string } = {
+    const payload: Omit<AccountItem, 'id'> & { password?: string; status?: string } = {
       name: formData.name.trim(),
       email: formData.email.trim(),
       phoneNumber: formData.phoneNumber.trim() || '-',
@@ -261,11 +318,11 @@ export default function PegawaiPage() {
       const data = await res.json();
       if (res.ok) {
         setNotification({
-          message: status === 'APPROVED' ? 'Pendaftaran pegawai berhasil disetujui!' : 'Pendaftaran pegawai telah ditolak.',
+          message: status === 'APPROVED' ? 'Pendaftaran akun berhasil disetujui!' : 'Pendaftaran akun telah ditolak.',
           type: 'success'
         });
         fetchRegistrations();
-        refreshPegawai();
+        refreshAccountList();
       } else {
         setNotification({
           message: data.error || 'Gagal memproses persetujuan.',
@@ -303,7 +360,7 @@ export default function PegawaiPage() {
         setNotification({
           message:
             status === 'APPROVED'
-              ? 'Permohonan reset kata sandi disetujui & kata sandi baru aktif.'
+              ? 'Permohonan reset kata sandi disetujui & kata sandi baru telah aktif.'
               : 'Permohonan reset kata sandi ditolak.',
           type: 'success'
         });
@@ -319,34 +376,120 @@ export default function PegawaiPage() {
     }
   };
 
+  // Handle Process Bidang Change
+  const handleProcessBidangChange = async (userId: string, action: 'APPROVE' | 'REJECT') => {
+    try {
+      const res = await fetch('/api/approval/bidang', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          action
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setNotification({
+          message: data.message || (action === 'APPROVE' ? 'Perubahan bidang berhasil disetujui!' : 'Permintaan perubahan bidang ditolak.'),
+          type: 'success'
+        });
+        fetchBidangChanges();
+        refreshAccountList();
+      } else {
+        setNotification({
+          message: data.error || 'Gagal memproses perubahan bidang.',
+          type: 'error'
+        });
+      }
+    } catch (err) {
+      console.error('Error processing bidang approval:', err);
+      setNotification({ message: 'Terjadi kesalahan koneksi server.', type: 'error' });
+    } finally {
+      setConfirmModal({ isOpen: false, type: 'approve-bidang', item: null });
+    }
+  };
+
+  // Filter States for Akun tab
+  const [accountRoleFilter, setAccountRoleFilter] = useState('ALL');
+  const [accountBidangFilter, setAccountBidangFilter] = useState('ALL');
+  const [accountSort, setAccountSort] = useState('newest');
+
   // Filter lists
-  const filteredPegawai = useMemo(() => {
+  const filteredAccounts = useMemo(() => {
     const q = searchQuery.toLowerCase();
-    return pegawaiList.filter(
-      (p) =>
+    const result = accountList.filter((p) => {
+      // Role Filter
+      if (accountRoleFilter !== 'ALL' && p.role !== accountRoleFilter) {
+        return false;
+      }
+
+      // Bidang Filter
+      if (accountBidangFilter !== 'ALL') {
+        const pBidangId = p.bidangId;
+        if (pBidangId !== accountBidangFilter) return false;
+      }
+
+      // Search Query
+      return (
         (p.name && p.name.toLowerCase().includes(q)) ||
         (p.email && p.email.toLowerCase().includes(q)) ||
         (p.phoneNumber && p.phoneNumber.toLowerCase().includes(q)) ||
         (p.bidang && p.bidang.toLowerCase().includes(q)) ||
         (p.bidangSingkatan && p.bidangSingkatan.toLowerCase().includes(q)) ||
         (p.role && p.role.toLowerCase().includes(q))
-    );
-  }, [pegawaiList, searchQuery]);
+      );
+    });
+
+    // Sort: default 'newest' (terbaru paling atas)
+    result.sort((a, b) => {
+      if (accountSort === 'newest') {
+        return (b.createdAt || '').localeCompare(a.createdAt || '');
+      }
+      if (accountSort === 'oldest') {
+        return (a.createdAt || '').localeCompare(b.createdAt || '');
+      }
+      if (accountSort === 'name_asc') {
+        return (a.name || '').localeCompare(b.name || '');
+      }
+      if (accountSort === 'name_desc') {
+        return (b.name || '').localeCompare(a.name || '');
+      }
+      if (accountSort === 'role') {
+        return (a.role || '').localeCompare(b.role || '');
+      }
+      return 0;
+    });
+
+    return result;
+  }, [accountList, searchQuery, accountRoleFilter, accountBidangFilter, accountSort]);
 
   const filteredRegistrations = useMemo(() => {
     const q = searchQuery.toLowerCase();
-    return registrations.filter(
+    const result = registrations.filter(
       (r) =>
         r.name?.toLowerCase().includes(q) ||
         r.email?.toLowerCase().includes(q) ||
         r.bidang?.toLowerCase().includes(q) ||
         r.status?.toLowerCase().includes(q)
     );
+    return result.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
   }, [registrations, searchQuery]);
+
+  const filteredBidangChanges = useMemo(() => {
+    const q = searchQuery.toLowerCase();
+    const result = bidangChanges.filter(
+      (b) =>
+        b.name?.toLowerCase().includes(q) ||
+        b.email?.toLowerCase().includes(q) ||
+        b.currentBidang?.toLowerCase().includes(q) ||
+        b.targetBidang?.toLowerCase().includes(q)
+    );
+    return result.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
+  }, [bidangChanges, searchQuery]);
 
   const filteredResetRequests = useMemo(() => {
     const q = searchQuery.toLowerCase();
-    return resetRequests.filter(
+    const result = resetRequests.filter(
       (r) =>
         r.userName?.toLowerCase().includes(q) ||
         r.email?.toLowerCase().includes(q) ||
@@ -354,17 +497,54 @@ export default function PegawaiPage() {
         r.reason?.toLowerCase().includes(q) ||
         r.status?.toLowerCase().includes(q)
     );
+    return result.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
   }, [resetRequests, searchQuery]);
+
+  if (isCheckingAuth) {
+    return (
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-4 border-amber-400 border-t-transparent rounded-full animate-spin" />
+          <p className="text-xs text-slate-400">Memeriksa hak akses administrator...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (currentUser?.role !== 'ADMIN') {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
+        <div className="max-w-md w-full bg-slate-900 border border-slate-800 p-8 rounded-2xl shadow-2xl flex flex-col items-center">
+          <div className="w-16 h-16 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400 mb-4">
+            <ShieldCheckIcon className="w-9 h-9" />
+          </div>
+          <span className="px-3 py-1 bg-rose-950/60 border border-rose-800/80 text-rose-300 text-[11px] font-bold rounded-full mb-3 uppercase tracking-wider">
+            Akses Terbatas
+          </span>
+          <h2 className="text-xl font-bold text-white mb-2">Hanya untuk Role Admin</h2>
+          <p className="text-xs text-slate-400 leading-relaxed mb-6">
+            Halaman Manajemen Akun dan Persetujuan memiliki hak akses khusus dan hanya dapat dibuka oleh akun dengan role <span className="font-semibold text-amber-400 font-mono">ADMIN</span>. Akun Anda saat ini tercatat sebagai <span className="font-semibold text-slate-200 font-mono">{currentUser?.role || 'PEGAWAI'}</span>.
+          </p>
+          <a
+            href="/dashboard"
+            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs rounded-xl transition-colors shadow-lg shadow-amber-400/10 w-full"
+          >
+            Kembali ke Beranda Dashboard
+          </a>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 w-full">
       {/* 1. Page Header */}
       <PageHeader
-        badgeText="Manajemen Kepegawaian & Akses"
-        title="Daftar Pegawai & Persetujuan"
-        description="Kelola direktori data pegawai BPKP Jabar, validasi persetujuan pendaftaran akun baru, serta penanganan permohonan reset kata sandi."
-        addButtonLabel={activeTab === 'pegawai' ? '+ Tambah Pegawai' : undefined}
-        onAddClick={activeTab === 'pegawai' ? openAdd : undefined}
+        badgeText="Manajemen Akun & Akses"
+        title="Manajemen Akun & Persetujuan"
+        description="Kelola data akun pengguna portal BPKP Jabar, validasi persetujuan registrasi akun pegawai baru, serta penanganan permohonan reset kata sandi."
+        addButtonLabel={activeTab === 'akun' ? '+ Tambah Akun' : undefined}
+        onAddClick={activeTab === 'akun' ? openAdd : undefined}
       />
 
       {/* 2. Alert Notification */}
@@ -379,24 +559,24 @@ export default function PegawaiPage() {
       {/* 3. Navigation Tabs */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/80 border border-slate-800 p-2.5 rounded-2xl">
         <div className="flex flex-wrap items-center gap-2">
-          {/* Tab 1: Pegawai */}
+          {/* Tab 1: Akun */}
           <button
             onClick={() => {
-              setActiveTab('pegawai');
+              setActiveTab('akun');
               setSearchQuery('');
             }}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
-              activeTab === 'pegawai'
+              activeTab === 'akun'
                 ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/10'
                 : 'text-slate-400 hover:text-white hover:bg-slate-800'
             }`}
           >
             <UserGroupIcon className="w-4 h-4" />
-            <span>Daftar Pegawai</span>
+            <span>Daftar Akun</span>
             <span className={`ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-extrabold ${
-              activeTab === 'pegawai' ? 'bg-slate-950/20 text-slate-950' : 'bg-slate-800 text-slate-300'
+              activeTab === 'akun' ? 'bg-slate-950/20 text-slate-950' : 'bg-slate-800 text-slate-300'
             }`}>
-              {pegawaiList.length}
+              {accountList.length}
             </span>
           </button>
 
@@ -421,7 +601,28 @@ export default function PegawaiPage() {
             )}
           </button>
 
-          {/* Tab 3: Reset Password */}
+          {/* Tab 3: Perubahan Bidang */}
+          <button
+            onClick={() => {
+              setActiveTab('bidang');
+              setSearchQuery('');
+            }}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+              activeTab === 'bidang'
+                ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/10'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+          >
+            <BuildingOffice2Icon className="w-4 h-4" />
+            <span>Persetujuan Bidang</span>
+            {pendingBidangCount > 0 && (
+              <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-extrabold bg-sky-500 text-white animate-pulse">
+                {pendingBidangCount}
+              </span>
+            )}
+          </button>
+
+          {/* Tab 4: Reset Password */}
           <button
             onClick={() => {
               setActiveTab('reset-password');
@@ -444,21 +645,24 @@ export default function PegawaiPage() {
         </div>
 
         {/* Tab-specific Controls (Filter & Refresh) */}
-        {activeTab !== 'pegawai' && (
+        {activeTab !== 'akun' && (
           <div className="flex items-center gap-2">
-            <select
-              value={approvalStatusFilter}
-              onChange={(e) => setApprovalStatusFilter(e.target.value as any)}
-              className="px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-amber-400 cursor-pointer"
-            >
-              <option value="PENDING">Status: Menunggu Persetujuan</option>
-              <option value="APPROVED">Status: Disetujui</option>
-              <option value="REJECTED">Status: Ditolak</option>
-              <option value="ALL">Semua Status</option>
-            </select>
+            {activeTab !== 'bidang' && (
+              <select
+                value={approvalStatusFilter}
+                onChange={(e) => setApprovalStatusFilter(e.target.value as any)}
+                className="px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-amber-400 cursor-pointer"
+              >
+                <option value="PENDING">Status: Menunggu Persetujuan</option>
+                <option value="APPROVED">Status: Disetujui</option>
+                <option value="REJECTED">Status: Ditolak</option>
+                <option value="ALL">Semua Status</option>
+              </select>
+            )}
             <button
               onClick={() => {
                 if (activeTab === 'registrasi') fetchRegistrations();
+                else if (activeTab === 'bidang') fetchBidangChanges();
                 else fetchResetRequests();
               }}
               disabled={isApprovalLoading}
@@ -471,30 +675,84 @@ export default function PegawaiPage() {
         )}
       </div>
 
-      {/* 4. Search Filter Input */}
-      <SearchInput
-        value={searchQuery}
-        onChange={setSearchQuery}
-        placeholder={
-          activeTab === 'pegawai'
-            ? 'Cari nama pegawai, email, no HP, bidang, atau role...'
-            : activeTab === 'registrasi'
-            ? 'Cari nama pendaftar, email, bidang kerja...'
-            : 'Cari pemohon reset sandi, email, atau alasan...'
-        }
-      />
+      {/* 4. Search Filter Input & Filter Bar */}
+      <div className="space-y-3">
+        <SearchInput
+          value={searchQuery}
+          onChange={setSearchQuery}
+          placeholder={
+            activeTab === 'akun'
+              ? 'Cari nama akun, email, no HP, bidang, atau role...'
+              : activeTab === 'registrasi'
+              ? 'Cari nama pendaftar, email, bidang kerja...'
+              : activeTab === 'bidang'
+              ? 'Cari nama pemohon perubahan bidang, email, atau bidang...'
+              : 'Cari pemohon reset sandi, email, atau alasan...'
+          }
+        />
+
+        {activeTab === 'akun' && (
+          <TableFilterBar
+            customFilters={[
+              {
+                key: 'role',
+                label: 'Hak Akses / Role',
+                value: accountRoleFilter,
+                onChange: setAccountRoleFilter,
+                icon: 'tag',
+                options: [
+                  { value: 'ALL', label: 'Semua Role' },
+                  { value: 'ADMIN', label: 'ADMIN' },
+                  { value: 'PEGAWAI', label: 'PEGAWAI' }
+                ]
+              },
+              {
+                key: 'bidang',
+                label: 'Bidang Kerja',
+                value: accountBidangFilter,
+                onChange: setAccountBidangFilter,
+                icon: 'building',
+                options: [
+                  { value: 'ALL', label: 'Semua Bidang' },
+                  ...bidangOptions.map((b) => ({
+                    value: b.id,
+                    label: b.singkatan ? `${b.nama} (${b.singkatan})` : b.nama
+                  }))
+                ]
+              }
+            ]}
+            sortOptions={[
+              { value: 'newest', label: 'Waktu Dibuat Terbaru' },
+              { value: 'oldest', label: 'Waktu Dibuat Terlama' },
+              { value: 'name_asc', label: 'Nama (A-Z)' },
+              { value: 'name_desc', label: 'Nama (Z-A)' },
+              { value: 'role', label: 'Role / Hak Akses' }
+            ]}
+            selectedSort={accountSort}
+            onSortChange={setAccountSort}
+            onResetFilters={() => {
+              setAccountRoleFilter('ALL');
+              setAccountBidangFilter('ALL');
+              setSearchQuery('');
+            }}
+            hasActiveFilters={accountRoleFilter !== 'ALL' || accountBidangFilter !== 'ALL' || searchQuery !== ''}
+            totalFilteredCount={filteredAccounts.length}
+            totalAllCount={accountList.length}
+          />
+        )}
+      </div>
 
       {/* ========================================================================= */}
-      {/* TAB 1: DAFTAR PEGAWAI */}
+      {/* TAB 1: DAFTAR AKUN */}
       {/* ========================================================================= */}
-      {activeTab === 'pegawai' && (
+      {activeTab === 'akun' && (
         <div className="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden shadow-xl backdrop-blur-md">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs text-slate-300">
               <thead className="bg-slate-950 text-slate-400 uppercase font-semibold border-b border-slate-800">
                 <tr>
                   <th className="px-6 py-4 w-16 text-center">No</th>
-                  <th className="px-6 py-4">Nama Pegawai & Email</th>
+                  <th className="px-6 py-4">Nama Akun & Email</th>
                   <th className="px-6 py-4">Kontak / No. HP</th>
                   <th className="px-6 py-4">Bidang Kerja</th>
                   <th className="px-6 py-4 text-center">Role</th>
@@ -502,11 +760,11 @@ export default function PegawaiPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800">
-                {filteredPegawai.map((pegawai, index) => {
-                  const isAdmin = pegawai.role === 'ADMIN';
+                {filteredAccounts.map((user, index) => {
+                  const isAdmin = user.role === 'ADMIN';
 
                   return (
-                    <tr key={pegawai.id} className="hover:bg-slate-800/40 transition-colors">
+                    <tr key={user.id} className="hover:bg-slate-800/40 transition-colors">
                       <td className="px-6 py-4 text-center font-bold text-slate-400">{index + 1}</td>
 
                       {/* Nama & Email */}
@@ -519,13 +777,13 @@ export default function PegawaiPage() {
                                 : 'bg-blue-500/10 text-blue-400 border-blue-500/30'
                             }`}
                           >
-                            {pegawai.name ? pegawai.name.charAt(0).toUpperCase() : 'U'}
+                            {user.name ? user.name.charAt(0).toUpperCase() : 'A'}
                           </div>
                           <div className="min-w-0">
                             <p className="font-semibold text-white text-xs sm:text-sm truncate">
-                              {pegawai.name}
+                              {user.name}
                             </p>
-                            <p className="text-[11px] text-slate-400 truncate font-mono">{pegawai.email}</p>
+                            <p className="text-[11px] text-slate-400 truncate font-mono">{user.email}</p>
                           </div>
                         </div>
                       </td>
@@ -534,7 +792,7 @@ export default function PegawaiPage() {
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2 font-mono text-[11px] text-slate-300">
                           <PhoneIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          <span>{pegawai.phoneNumber || '-'}</span>
+                          <span>{user.phoneNumber || '-'}</span>
                         </div>
                       </td>
 
@@ -543,11 +801,11 @@ export default function PegawaiPage() {
                         <div className="flex items-center gap-1.5 text-xs text-slate-300">
                           <BuildingOffice2Icon className="w-4 h-4 text-slate-400 shrink-0" />
                           <span className="truncate max-w-[220px]">
-                            {pegawai.bidang && pegawai.bidang !== '-' ? (
-                              pegawai.bidangSingkatan ? (
-                                `${pegawai.bidang} (${pegawai.bidangSingkatan})`
+                            {user.bidang && user.bidang !== '-' ? (
+                              user.bidangSingkatan ? (
+                                `${user.bidang} (${user.bidangSingkatan})`
                               ) : (
-                                pegawai.bidang
+                                user.bidang
                               )
                             ) : (
                               'Belum Ditentukan'
@@ -562,12 +820,12 @@ export default function PegawaiPage() {
                           {isAdmin ? (
                             <>
                               <ShieldCheckIcon className="w-4 h-4 text-amber-400 shrink-0" />
-                              <span className="text-amber-300">{pegawai.role}</span>
+                              <span className="text-amber-300">{user.role}</span>
                             </>
                           ) : (
                             <>
                               <UserIcon className="w-4 h-4 text-emerald-400 shrink-0" />
-                              <span className="text-emerald-300">{pegawai.role}</span>
+                              <span className="text-emerald-300">{user.role}</span>
                             </>
                           )}
                         </div>
@@ -576,23 +834,23 @@ export default function PegawaiPage() {
                       {/* Aksi */}
                       <td className="px-6 py-4 text-right">
                         <ActionButtons
-                          onShow={() => openDetail(pegawai)}
-                          onEdit={() => openEdit(pegawai)}
-                          onDelete={() => openDelete(pegawai)}
-                          showTitle="Lihat Detail Pegawai"
-                          editTitle="Edit Data Pegawai"
-                          deleteTitle="Hapus Pegawai"
+                          onShow={() => openDetail(user)}
+                          onEdit={() => openEdit(user)}
+                          onDelete={() => openDelete(user)}
+                          showTitle="Lihat Detail Akun"
+                          editTitle="Edit Data Akun"
+                          deleteTitle="Hapus Akun"
                         />
                       </td>
                     </tr>
                   );
                 })}
 
-                {filteredPegawai.length === 0 && (
+                {filteredAccounts.length === 0 && (
                   <tr>
                     <td colSpan={6} className="px-6 py-10 text-center text-slate-500">
                       <UserGroupIcon className="w-8 h-8 mx-auto text-slate-600 mb-2" />
-                      <span>Tidak ditemukan data pegawai yang cocok dengan pencarian &quot;{searchQuery}&quot;</span>
+                      <span>Tidak ditemukan data akun yang cocok dengan pencarian &quot;{searchQuery}&quot;</span>
                     </td>
                   </tr>
                 )}
@@ -612,7 +870,7 @@ export default function PegawaiPage() {
               <thead className="bg-slate-950 text-slate-400 uppercase font-semibold border-b border-slate-800">
                 <tr>
                   <th className="px-6 py-4 w-14 text-center">No</th>
-                  <th className="px-6 py-4">Nama Pegawai & Email</th>
+                  <th className="px-6 py-4">Nama Pendaftar & Email</th>
                   <th className="px-6 py-4">Bidang Kerja</th>
                   <th className="px-6 py-4">Tgl Registrasi</th>
                   <th className="px-6 py-4 text-center">Status</th>
@@ -633,7 +891,7 @@ export default function PegawaiPage() {
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           <div className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 bg-blue-500/10 text-blue-400 border border-blue-500/30">
-                            {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
+                            {user.name ? user.name.charAt(0).toUpperCase() : 'A'}
                           </div>
                           <div>
                             <p className="font-semibold text-white text-xs sm:text-sm">{user.name}</p>
@@ -769,7 +1027,131 @@ export default function PegawaiPage() {
       )}
 
       {/* ========================================================================= */}
-      {/* TAB 3: PERSETUJUAN RESET PASSWORD */}
+      {/* TAB 3: PERSETUJUAN PERUBAHAN BIDANG */}
+      {/* ========================================================================= */}
+      {activeTab === 'bidang' && (
+        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden shadow-xl backdrop-blur-md">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs text-slate-300">
+              <thead className="bg-slate-950 text-slate-400 uppercase font-semibold border-b border-slate-800">
+                <tr>
+                  <th className="px-6 py-4 w-14 text-center">No</th>
+                  <th className="px-6 py-4">Pegawai / Akun</th>
+                  <th className="px-6 py-4">Bidang Saat Ini</th>
+                  <th className="px-6 py-4">Permohonan Bidang Baru</th>
+                  <th className="px-6 py-4">Tgl Pengajuan</th>
+                  <th className="px-6 py-4 text-right w-44">Aksi Persetujuan</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800">
+                {filteredBidangChanges.map((item, idx) => (
+                  <tr key={item.id} className="hover:bg-slate-800/40 transition-colors">
+                    <td className="px-6 py-4 text-center font-bold text-slate-400">{idx + 1}</td>
+
+                    {/* Pegawai */}
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 bg-sky-500/10 text-sky-400 border border-sky-500/30">
+                          {item.name ? item.name.charAt(0).toUpperCase() : 'U'}
+                        </div>
+                        <div>
+                          <p className="font-semibold text-white text-xs sm:text-sm">{item.name}</p>
+                          <p className="text-[11px] text-slate-400 font-mono">{item.email}</p>
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Bidang Saat Ini */}
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-1.5 text-xs text-slate-300">
+                        <BuildingOffice2Icon className="w-4 h-4 text-slate-500 shrink-0" />
+                        <span>
+                          {item.currentBidang ? (
+                            item.currentBidangSingkatan ? (
+                              `${item.currentBidang} (${item.currentBidangSingkatan})`
+                            ) : (
+                              item.currentBidang
+                            )
+                          ) : (
+                            <span className="text-slate-500 italic">Belum Ditentukan</span>
+                          )}
+                        </span>
+                      </div>
+                    </td>
+
+                    {/* Permohonan Bidang Baru */}
+                    <td className="px-6 py-4">
+                      <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-sky-500/10 border border-sky-500/30 text-sky-300 font-semibold text-xs">
+                        <BuildingOffice2Icon className="w-4 h-4 text-sky-400 shrink-0" />
+                        <span>
+                          {item.targetBidangSingkatan
+                            ? `${item.targetBidang} (${item.targetBidangSingkatan})`
+                            : item.targetBidang}
+                        </span>
+                      </div>
+                    </td>
+
+                    {/* Tgl Pengajuan */}
+                    <td className="px-6 py-4 text-slate-400 text-[11px]">
+                      {new Date(item.updatedAt).toLocaleDateString('id-ID', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </td>
+
+                    {/* Aksi */}
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() =>
+                            setConfirmModal({
+                              isOpen: true,
+                              type: 'approve-bidang',
+                              item: item
+                            })
+                          }
+                          className="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-950 bg-emerald-400 hover:bg-emerald-300 transition-colors flex items-center gap-1 shadow-sm"
+                        >
+                          <CheckCircleIcon className="w-3.5 h-3.5" />
+                          <span>Setujui</span>
+                        </button>
+                        <button
+                          onClick={() =>
+                            setConfirmModal({
+                              isOpen: true,
+                              type: 'reject-bidang',
+                              item: item
+                            })
+                          }
+                          className="px-3 py-1.5 rounded-lg text-xs font-bold text-rose-300 bg-rose-950/60 hover:bg-rose-900 border border-rose-800 transition-colors flex items-center gap-1"
+                        >
+                          <XCircleIcon className="w-3.5 h-3.5" />
+                          <span>Tolak</span>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+
+                {filteredBidangChanges.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
+                      <BuildingOffice2Icon className="w-8 h-8 mx-auto text-slate-600 mb-2" />
+                      <span>Tidak ada permohonan perubahan bidang yang menunggu persetujuan.</span>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 4: PERSETUJUAN RESET PASSWORD */}
       {/* ========================================================================= */}
       {activeTab === 'reset-password' && (
         <div className="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden shadow-xl backdrop-blur-md">
@@ -778,7 +1160,7 @@ export default function PegawaiPage() {
               <thead className="bg-slate-950 text-slate-400 uppercase font-semibold border-b border-slate-800">
                 <tr>
                   <th className="px-6 py-4 w-14 text-center">No</th>
-                  <th className="px-6 py-4">Pegawai / Pemohon</th>
+                  <th className="px-6 py-4">Pemohon / Akun</th>
                   <th className="px-6 py-4">Alasan / Permohonan</th>
                   <th className="px-6 py-4">Tgl Pengajuan</th>
                   <th className="px-6 py-4 text-center">Status</th>
@@ -814,7 +1196,7 @@ export default function PegawaiPage() {
                         <p className="text-xs text-slate-300">{req.reason || 'Lupa kata sandi akun'}</p>
                         {req.newPassword && (
                           <p className="text-[11px] text-amber-400/90 font-mono mt-0.5">
-                            *Meminta perubahan sandi
+                            *Meminta sandi baru
                           </p>
                         )}
                         {req.adminNotes && (
@@ -917,123 +1299,103 @@ export default function PegawaiPage() {
       )}
 
       {/* ========================================================================= */}
-      {/* MODAL TAMBAH / EDIT PEGAWAI */}
+      {/* MODAL 1: FORM TAMBAH / EDIT AKUN */}
       {/* ========================================================================= */}
       <Modal
         isOpen={isFormOpen}
         onClose={closeForm}
-        title={
-          <div className="flex items-center gap-2">
-            <SparklesIcon className="w-5 h-5 text-amber-400" />
-            <span>{editingItem ? 'Edit Data Pegawai' : 'Tambah Pegawai Baru'}</span>
-          </div>
-        }
+        title={editingItem ? 'Edit Data Akun' : 'Tambah Akun Baru'}
         maxWidth="lg"
       >
         <form onSubmit={handleFormSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+            <label className="block text-xs font-semibold text-slate-300 mb-1">
               Nama Lengkap <span className="text-rose-400">*</span>
             </label>
-            <div className="relative">
-              <UserIcon className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-              <input
-                type="text"
-                required
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Contoh: Robi Munawir, S.Ak."
-                className="w-full pl-9 pr-3 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-amber-400"
-              />
-            </div>
+            <input
+              type="text"
+              required
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              placeholder="Contoh: Ahmad Hidayat, S.E., M.Ak."
+              className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-amber-400"
+            />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+              <label className="block text-xs font-semibold text-slate-300 mb-1">
                 Alamat Email <span className="text-rose-400">*</span>
               </label>
-              <div className="relative">
-                <EnvelopeIcon className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-                <input
-                  type="email"
-                  required
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="pegawai@bpkp.go.id"
-                  className="w-full pl-9 pr-3 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-amber-400 font-mono"
-                />
-              </div>
+              <input
+                type="email"
+                required
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                placeholder="nama@bpkp.go.id"
+                className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-amber-400"
+              />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                {editingItem ? 'Kata Sandi Baru (Opsional)' : 'Kata Sandi Akun'}
+              <label className="block text-xs font-semibold text-slate-300 mb-1">
+                Nomor Telepon / WhatsApp
               </label>
               <input
-                type="password"
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                placeholder={editingItem ? 'Kosongkan jika tidak diubah' : 'Min. 8 karakter'}
-                className="w-full px-3 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-amber-400"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-              Nomor Telepon / HP <span className="text-slate-500 font-normal">(Opsional)</span>
-            </label>
-            <div className="relative">
-              <PhoneIcon className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-              <input
-                type="tel"
+                type="text"
                 value={formData.phoneNumber}
                 onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
-                placeholder="08123456789"
-                className="w-full pl-9 pr-3 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-amber-400 font-mono"
+                placeholder="081234567890"
+                className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-amber-400"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+              <label className="block text-xs font-semibold text-slate-300 mb-1">
                 Bidang Kerja
               </label>
               <select
                 value={formData.bidangId}
                 onChange={(e) => setFormData({ ...formData, bidangId: e.target.value })}
-                className="w-full px-3 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-amber-400 cursor-pointer"
+                className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-amber-400 cursor-pointer"
               >
-                <option value="" className="bg-slate-900 text-slate-400">
-                  -- Pilih Unit Bidang --
-                </option>
+                <option value="">-- Pilih Bidang Kerja --</option>
                 {bidangOptions.map((b) => (
-                  <option key={b.id} value={b.id} className="bg-slate-900 text-slate-200">
-                    {b.singkatan ? `${b.nama} (${b.singkatan})` : b.nama}
+                  <option key={b.id} value={b.id}>
+                    {b.nama} {b.singkatan ? `(${b.singkatan})` : ''}
                   </option>
                 ))}
               </select>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                Hak Akses (Role) <span className="text-rose-400">*</span>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">
+                Peran / Role Akun <span className="text-rose-400">*</span>
               </label>
               <select
                 value={formData.role}
-                onChange={(e) => setFormData({ ...formData, role: e.target.value as 'ADMIN' | 'PEGAWAI' })}
-                className="w-full px-3 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-amber-400 font-semibold cursor-pointer"
+                onChange={(e) => setFormData({ ...formData, role: e.target.value as any })}
+                className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-amber-400 cursor-pointer"
               >
-                <option value="PEGAWAI" className="bg-slate-900 text-emerald-400">
-                  PEGAWAI (Default)
-                </option>
-                <option value="ADMIN" className="bg-slate-900 text-amber-400">
-                  ADMIN (Administrator Sistem)
-                </option>
+                <option value="PEGAWAI">PEGAWAI (Auditor / Staff)</option>
+                <option value="ADMIN">ADMIN (Administrator)</option>
               </select>
             </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1">
+              Kata Sandi {editingItem ? '(Kosongkan jika tidak ingin mengubah)' : '<span className="text-rose-400">*</span>'}
+            </label>
+            <input
+              type="text"
+              value={formData.password}
+              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              placeholder={editingItem ? 'Biarkan kosong untuk mempertahankan sandi saat ini' : 'Minimal 6 karakter (default: 12345678)'}
+              className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-amber-400 font-mono"
+            />
           </div>
 
           <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-slate-800">
@@ -1048,72 +1410,47 @@ export default function PegawaiPage() {
               type="submit"
               className="px-5 py-2 rounded-xl text-xs font-bold text-slate-950 bg-amber-400 hover:bg-amber-300 transition-colors shadow-md"
             >
-              {editingItem ? 'Simpan Perubahan' : 'Tambah Pegawai'}
+              {editingItem ? 'Simpan Perubahan' : 'Tambah Akun'}
             </button>
           </div>
         </form>
       </Modal>
 
       {/* ========================================================================= */}
-      {/* MODAL DETAIL PEGAWAI */}
+      {/* MODAL 2: DETAIL AKUN */}
       {/* ========================================================================= */}
-      <Modal
-        isOpen={!!detailItem}
-        onClose={closeDetail}
-        title={
-          <div className="flex items-center gap-2">
-            <UserIcon className="w-5 h-5 text-amber-400" />
-            <span>Profil Lengkap Pegawai</span>
-          </div>
-        }
-        maxWidth="md"
-      >
-        {detailItem && (
+      {detailItem && (
+        <Modal
+          isOpen={true}
+          onClose={closeDetail}
+          title="Informasi Lengkap Akun"
+          maxWidth="md"
+        >
           <div className="space-y-4">
-            <div className="flex items-center gap-4 p-4 rounded-xl bg-slate-950/80 border border-slate-800">
-              <div
-                className={`w-14 h-14 rounded-2xl flex items-center justify-center font-bold text-xl border ${
-                  detailItem.role === 'ADMIN'
-                    ? 'bg-amber-400/10 text-amber-400 border-amber-400/30'
-                    : 'bg-blue-500/10 text-blue-400 border-blue-500/30'
-                }`}
-              >
-                {detailItem.name.charAt(0).toUpperCase()}
+            <div className="flex items-center gap-3.5 p-4 rounded-xl bg-slate-950 border border-slate-800">
+              <div className="w-12 h-12 rounded-xl bg-amber-400/10 text-amber-400 border border-amber-400/30 flex items-center justify-center font-bold text-base">
+                {detailItem.name ? detailItem.name.charAt(0).toUpperCase() : 'A'}
               </div>
               <div>
-                <h4 className="text-sm font-bold text-white">{detailItem.name}</h4>
+                <h3 className="text-sm font-bold text-white">{detailItem.name}</h3>
                 <p className="text-xs text-slate-400 font-mono">{detailItem.email}</p>
-                <div className="mt-1">
-                  <span
-                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold border ${
-                      detailItem.role === 'ADMIN'
-                        ? 'bg-amber-400/10 text-amber-300 border-amber-400/30'
-                        : 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
-                    }`}
-                  >
-                    {detailItem.role}
-                  </span>
-                </div>
+                <span className={`inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-bold ${
+                  detailItem.role === 'ADMIN' ? 'bg-amber-400/20 text-amber-300' : 'bg-emerald-400/20 text-emerald-300'
+                }`}>
+                  {detailItem.role}
+                </span>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-              <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800">
-                <span className="block text-slate-500 text-[11px] mb-0.5">No. Telepon / WhatsApp</span>
-                <span className="font-mono text-slate-200">{detailItem.phoneNumber || '-'}</span>
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80">
+                <span className="text-slate-400 block text-[11px]">No. Telepon / WA:</span>
+                <span className="font-semibold text-slate-200 mt-0.5 block">{detailItem.phoneNumber || '-'}</span>
               </div>
-              <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800">
-                <span className="block text-slate-500 text-[11px] mb-0.5">Bidang Kerja</span>
-                <span className="text-slate-200">
-                  {detailItem.bidang && detailItem.bidang !== '-' ? (
-                    detailItem.bidangSingkatan ? (
-                      `${detailItem.bidang} (${detailItem.bidangSingkatan})`
-                    ) : (
-                      detailItem.bidang
-                    )
-                  ) : (
-                    '-'
-                  )}
+              <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80">
+                <span className="text-slate-400 block text-[11px]">Bidang Kerja:</span>
+                <span className="font-semibold text-slate-200 mt-0.5 block">
+                  {detailItem.bidang && detailItem.bidang !== '-' ? detailItem.bidang : 'Belum Ditentukan'}
                 </span>
               </div>
             </div>
@@ -1128,11 +1465,25 @@ export default function PegawaiPage() {
               </button>
             </div>
           </div>
-        )}
-      </Modal>
+        </Modal>
+      )}
 
       {/* ========================================================================= */}
-      {/* MODAL KONFIRMASI APPROVAL / REJECT */}
+      {/* MODAL 3: DELETE CONFIRMATION AKUN */}
+      {/* ========================================================================= */}
+      {deletingItem && (
+        <DeleteConfirmModal
+          isOpen={true}
+          onClose={closeDelete}
+          onConfirm={deleteItem}
+          title="Hapus Data Akun"
+          itemName={deletingItem.name || deletingItem.email}
+          description={`Apakah Anda yakin ingin menghapus akun "${deletingItem.name || deletingItem.email}"? Tindakan ini tidak dapat dibatalkan.`}
+        />
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 4: KONFIRMASI PERSETUJUAN (REGISTRASI, BIDANG & RESET PASSWORD) */}
       {/* ========================================================================= */}
       <Modal
         isOpen={confirmModal.isOpen}
@@ -1141,10 +1492,12 @@ export default function PegawaiPage() {
           <div className="flex items-center gap-2">
             <ShieldCheckIcon className="w-5 h-5 text-amber-400" />
             <span>
-              {confirmModal.type === 'approve-reg' && 'Konfirmasi Persetujuan Akun Pegawai'}
-              {confirmModal.type === 'reject-reg' && 'Konfirmasi Penolakan Pendaftaran'}
+              {confirmModal.type === 'approve-reg' && 'Konfirmasi Persetujuan Akun'}
+              {confirmModal.type === 'reject-reg' && 'Konfirmasi Penolakan Akun'}
+              {confirmModal.type === 'approve-bidang' && 'Konfirmasi Persetujuan Perubahan Bidang'}
+              {confirmModal.type === 'reject-bidang' && 'Konfirmasi Penolakan Perubahan Bidang'}
               {confirmModal.type === 'approve-reset' && 'Setujui Reset Kata Sandi'}
-              {confirmModal.type === 'reject-reset' && 'Tolak Permohonan Reset Kata Sandi'}
+              {confirmModal.type === 'reject-reset' && 'Tolak Permohonan Reset Sandi'}
             </span>
           </div>
         }
@@ -1153,7 +1506,7 @@ export default function PegawaiPage() {
         <div className="space-y-4">
           <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs text-slate-400">Nama Pegawai:</span>
+              <span className="text-xs text-slate-400">Nama Akun:</span>
               <span className="text-xs font-bold text-white">
                 {confirmModal.item?.name || confirmModal.item?.userName}
               </span>
@@ -1168,13 +1521,30 @@ export default function PegawaiPage() {
                 <span className="text-xs text-slate-300">{confirmModal.item?.bidang}</span>
               </div>
             )}
+            {confirmModal.item?.currentBidang !== undefined && (
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-400">Bidang Saat Ini:</span>
+                <span className="text-xs text-slate-300">
+                  {confirmModal.item?.currentBidang || 'Belum Ditentukan'}
+                </span>
+              </div>
+            )}
+            {confirmModal.item?.targetBidang !== undefined && (
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-400">Permohonan Bidang Baru:</span>
+                <span className="text-xs font-bold text-sky-400">
+                  {confirmModal.item?.targetBidang}
+                </span>
+              </div>
+            )}
           </div>
 
+          {/* Form khusus Approve Reset Password */}
           {confirmModal.type === 'approve-reset' && (
             <div className="space-y-3">
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Kata Sandi Baru yang Akan Diterapkan:
+                  Kata Sandi Baru yang Diberikan:
                 </label>
                 <input
                   type="text"
@@ -1185,9 +1555,6 @@ export default function PegawaiPage() {
                   placeholder="Masukkan kata sandi baru"
                   className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-amber-400 font-mono"
                 />
-                <p className="text-[11px] text-slate-400 mt-1">
-                  Kata sandi akun pengguna ini akan segera diubah ke kata sandi di atas.
-                </p>
               </div>
 
               <div>
@@ -1200,13 +1567,14 @@ export default function PegawaiPage() {
                   onChange={(e) =>
                     setConfirmModal({ ...confirmModal, adminNotes: e.target.value })
                   }
-                  placeholder="Disetujui oleh Admin"
+                  placeholder="Disetujui oleh Administrator"
                   className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-amber-400"
                 />
               </div>
             </div>
           )}
 
+          {/* Form khusus Reject Reset Password */}
           {confirmModal.type === 'reject-reset' && (
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1">
@@ -1218,22 +1586,34 @@ export default function PegawaiPage() {
                 onChange={(e) =>
                   setConfirmModal({ ...confirmModal, adminNotes: e.target.value })
                 }
-                placeholder="Contoh: Identitas email tidak valid"
+                placeholder="Contoh: Identitas pemohon tidak sesuai"
                 className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-amber-400"
               />
             </div>
           )}
 
+          {/* Prompt Message */}
           {confirmModal.type === 'approve-reg' && (
             <p className="text-xs text-slate-300 leading-relaxed">
-              Setelah disetujui, pegawai ini akan dapat langsung masuk (login) ke dalam sistem portal
-              BPKP Jawa Barat.
+              Setelah disetujui, akun pegawai ini akan aktif dan dapat digunakan untuk masuk ke portal BPKP Jawa Barat.
             </p>
           )}
 
           {confirmModal.type === 'reject-reg' && (
             <p className="text-xs text-rose-300 leading-relaxed">
-              Apakah Anda yakin ingin menolak pendaftaran akun ini? Pengguna tidak akan dapat masuk ke sistem.
+              Apakah Anda yakin ingin menolak pendaftaran akun ini? Pengguna tidak akan dapat mengakses sistem.
+            </p>
+          )}
+
+          {confirmModal.type === 'approve-bidang' && (
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Apakah Anda yakin ingin menyetujui perubahan bidang pegawai ini ke <strong className="text-sky-400 font-semibold">{confirmModal.item?.targetBidang}</strong>? Bidang aktif pegawai akan langsung diperbarui.
+            </p>
+          )}
+
+          {confirmModal.type === 'reject-bidang' && (
+            <p className="text-xs text-rose-300 leading-relaxed">
+              Apakah Anda yakin ingin menolak permohonan perubahan bidang ini? Pegawai akan tetap berada di bidang saat ini.
             </p>
           )}
 
@@ -1263,6 +1643,26 @@ export default function PegawaiPage() {
                 className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-500 transition-colors shadow-md"
               >
                 Tolak Pendaftaran
+              </button>
+            )}
+
+            {confirmModal.type === 'approve-bidang' && (
+              <button
+                type="button"
+                onClick={() => handleProcessBidangChange(confirmModal.item.id, 'APPROVE')}
+                className="px-5 py-2 rounded-xl text-xs font-bold text-slate-950 bg-emerald-400 hover:bg-emerald-300 transition-colors shadow-md"
+              >
+                Ya, Setujui Bidang
+              </button>
+            )}
+
+            {confirmModal.type === 'reject-bidang' && (
+              <button
+                type="button"
+                onClick={() => handleProcessBidangChange(confirmModal.item.id, 'REJECT')}
+                className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-500 transition-colors shadow-md"
+              >
+                Tolak Perubahan
               </button>
             )}
 
@@ -1302,18 +1702,6 @@ export default function PegawaiPage() {
           </div>
         </div>
       </Modal>
-
-      {/* ========================================================================= */}
-      {/* DIALOG KONFIRMASI HAPUS PEGAWAI */}
-      {/* ========================================================================= */}
-      <DeleteConfirmModal
-        isOpen={!!deletingItem}
-        onClose={closeDelete}
-        onConfirm={deleteItem}
-        title="Hapus Pegawai"
-        itemName={deletingItem?.name}
-        description="Apakah Anda yakin ingin menghapus akun pegawai ini dari sistem? Tindakan ini tidak dapat dibatalkan."
-      />
     </div>
   );
 }

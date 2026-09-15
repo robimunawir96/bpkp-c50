@@ -7,7 +7,8 @@ import {
   ListBulletIcon,
   PencilSquareIcon,
   ChevronDownIcon,
-  MagnifyingGlassIcon
+  MagnifyingGlassIcon,
+  BuildingOffice2Icon
 } from '@heroicons/react/24/outline';
 import { Modal } from '@/components/common';
 import {
@@ -16,6 +17,7 @@ import {
   formatTanggalLengkap,
   parseDateToInputFormat
 } from '@/lib/suratData';
+import { useUserBidang } from '@/lib/useUserBidang';
 
 interface SuratPengantarFormModalProps {
   isOpen: boolean;
@@ -32,6 +34,10 @@ export const SuratPengantarFormModal: React.FC<SuratPengantarFormModalProps> = (
   editItem,
   lhpList
 }) => {
+  const userBidang = useUserBidang();
+  const isAdmin = userBidang.userRole === 'ADMIN';
+  const [bidangOptions, setBidangOptions] = useState<Array<{ id: string; nama: string; singkatan?: string | null }>>([]);
+
   const [inputTahun, setInputTahun] = useState(new Date().getFullYear().toString());
   const [inputTanggalDibuat, setInputTanggalDibuat] = useState('');
 
@@ -41,11 +47,23 @@ export const SuratPengantarFormModal: React.FC<SuratPengantarFormModalProps> = (
   const [isNoLHPDropdownOpen, setIsNoLHPDropdownOpen] = useState(false);
 
   const [formData, setFormData] = useState({
+    bidangId: '',
     noLHP: '',
     noSP: '',
     tujuan: '',
     linkDrive: ''
   });
+
+  useEffect(() => {
+    if (isAdmin) {
+      fetch('/api/bidang')
+        .then((res) => (res.ok ? res.json() : []))
+        .then((data) => {
+          if (Array.isArray(data)) setBidangOptions(data);
+        })
+        .catch((err) => console.error('Error fetching bidang options:', err));
+    }
+  }, [isAdmin]);
 
   // Opsi No LHP unik dari LHP
   const availableNoLHPOptions = Array.from(
@@ -72,6 +90,7 @@ export const SuratPengantarFormModal: React.FC<SuratPengantarFormModalProps> = (
       setInputTahun(editItem.tahun || new Date().getFullYear().toString());
       setInputTanggalDibuat(parseDateToInputFormat(editItem.tanggalDibuat || ''));
       setFormData({
+        bidangId: editItem.bidangId || (editItem.bidang?.id ?? (userBidang.bidangId || '')),
         noLHP: editItem.noLHP || '',
         noSP: editItem.noSP || '',
         tujuan: editItem.tujuan || '',
@@ -89,6 +108,7 @@ export const SuratPengantarFormModal: React.FC<SuratPengantarFormModalProps> = (
       setInputTahun(new Date().getFullYear().toString());
       setInputTanggalDibuat('');
       setFormData({
+        bidangId: userBidang.bidangId || '',
         noLHP: '',
         noSP: '',
         tujuan: '',
@@ -97,7 +117,7 @@ export const SuratPengantarFormModal: React.FC<SuratPengantarFormModalProps> = (
       setNoLHPSearchQuery('');
       setNoLHPInputMode('select');
     }
-  }, [editItem, isOpen]);
+  }, [editItem, isOpen, userBidang.bidangId]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -108,6 +128,7 @@ export const SuratPengantarFormModal: React.FC<SuratPengantarFormModalProps> = (
     const itemData: Omit<SuratPengantarItem, 'id'> = {
       tahun: inputTahun || new Date().getFullYear().toString(),
       tanggalDibuat: tanggalDibuatFormatted,
+      bidangId: formData.bidangId || null,
       noLHP: formData.noLHP.trim(),
       noSP: formData.noSP.trim(),
       tujuan: formData.tujuan.trim(),
@@ -136,13 +157,13 @@ export const SuratPengantarFormModal: React.FC<SuratPengantarFormModalProps> = (
             </label>
             <input
               type="number"
-              min="2000"
+              min="1900"
               max="2099"
               required
               value={inputTahun}
               onChange={(e) => setInputTahun(e.target.value)}
               className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-lg text-xs sm:text-sm text-white focus:outline-none focus:border-amber-400"
-              placeholder="Contoh: 2026"
+              placeholder={`Contoh: ${new Date().getFullYear()}`}
             />
           </div>
           <div>
@@ -153,10 +174,58 @@ export const SuratPengantarFormModal: React.FC<SuratPengantarFormModalProps> = (
               type="date"
               required
               value={inputTanggalDibuat}
-              onChange={(e) => setInputTanggalDibuat(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                setInputTanggalDibuat(val);
+                if (!editItem && val) {
+                  const extractedYear = new Date(val).getFullYear();
+                  if (!isNaN(extractedYear)) {
+                    setInputTahun(extractedYear.toString());
+                  }
+                }
+              }}
               className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-lg text-xs sm:text-sm text-white focus:outline-none focus:border-amber-400"
             />
           </div>
+        </div>
+
+        {/* Bidang Kerja */}
+        <div>
+          <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center justify-between">
+            <span className="flex items-center gap-1.5">
+              <BuildingOffice2Icon className="w-4 h-4 text-amber-400" />
+              <span>Bidang Kerja / Unit</span>
+            </span>
+            <span className="text-[10px] text-amber-400/90 font-mono bg-amber-400/10 px-1.5 py-0.5 rounded border border-amber-400/20">
+              {isAdmin ? 'Pilihan Administrator' : 'Otomatis sesuai akun'}
+            </span>
+          </label>
+          {isAdmin ? (
+            <select
+              value={formData.bidangId}
+              onChange={(e) => setFormData({ ...formData, bidangId: e.target.value })}
+              className="w-full px-3.5 py-2.5 bg-slate-950/80 border border-slate-800 rounded-xl text-xs sm:text-sm text-white focus:outline-none focus:border-amber-400 cursor-pointer"
+            >
+              <option value="">-- Pilih Bidang Kerja --</option>
+              {bidangOptions.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.singkatan ? `${b.nama} (${b.singkatan})` : b.nama}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <div className="w-full px-3.5 py-2.5 bg-slate-900/90 border border-slate-800 rounded-lg text-xs sm:text-sm text-slate-300 flex items-center justify-between cursor-not-allowed select-none">
+              <span className="font-medium text-white">
+                {editItem?.bidang?.nama || userBidang.bidangNama || (userBidang.isLoading ? 'Memuat bidang...' : 'Belum Ditentukan')}
+              </span>
+              {(editItem?.bidang?.singkatan || userBidang.bidangSingkatan) && (
+                <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20 font-mono">
+                  {editItem?.bidang?.singkatan || userBidang.bidangSingkatan}
+                </span>
+              )}
+            </div>
+          )}
+          <input type="hidden" name="bidangId" value={formData.bidangId} />
         </div>
 
         {/* Grid Nomor LHP & Nomor SP */}

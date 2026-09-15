@@ -1,14 +1,15 @@
 'use client';
 
-import React, { useMemo } from 'react';
-import { FolderIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
+import React, { useState, useEffect, useMemo } from 'react';
+import { FolderIcon, DocumentTextIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
 import {
   PageHeader,
   SearchInput,
   AlertMessage,
   Modal,
   DeleteConfirmModal,
-  ActionButtons
+  ActionButtons,
+  TableFilterBar
 } from '@/components/common';
 import { useDataManager } from '@/lib/useDataManager';
 
@@ -21,6 +22,24 @@ interface BidangItem {
 const defaultBidang: BidangItem[] = [];
 
 export default function BidangPage() {
+  // Auth & Role checking
+  const [currentUser, setCurrentUser] = useState<{ role?: string; name?: string; email?: string } | null>(null);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('bpkp_auth_user');
+      if (stored) {
+        try {
+          setCurrentUser(JSON.parse(stored));
+        } catch (e) {
+          console.error(e);
+        }
+      }
+      setIsCheckingAuth(false);
+    }
+  }, []);
+
   const {
     data: bidangList,
     searchQuery,
@@ -71,13 +90,66 @@ export default function BidangPage() {
     setSingkatanBidang('');
   };
 
+  const [selectedSort, setSelectedSort] = useState('nama_asc');
+
   const filteredList = useMemo(() => {
     const query = searchQuery.toLowerCase();
-    return bidangList.filter((b) =>
+    const result = bidangList.filter((b) =>
       (b.nama || '').toLowerCase().includes(query) ||
       (b.singkatan || '').toLowerCase().includes(query)
     );
-  }, [bidangList, searchQuery]);
+
+    result.sort((a, b) => {
+      if (selectedSort === 'nama_asc') {
+        return (a.nama || '').localeCompare(b.nama || '');
+      }
+      if (selectedSort === 'nama_desc') {
+        return (b.nama || '').localeCompare(a.nama || '');
+      }
+      if (selectedSort === 'singkatan') {
+        return (a.singkatan || '').localeCompare(b.singkatan || '');
+      }
+      return 0;
+    });
+
+    return result;
+  }, [bidangList, searchQuery, selectedSort]);
+
+  if (isCheckingAuth) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-4 border-amber-400 border-t-transparent rounded-full animate-spin" />
+          <p className="text-xs text-slate-400">Memeriksa hak akses administrator...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (currentUser?.role !== 'ADMIN') {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
+        <div className="max-w-md w-full bg-slate-900 border border-slate-800 p-8 rounded-2xl shadow-2xl flex flex-col items-center">
+          <div className="w-16 h-16 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400 mb-4">
+            <ShieldCheckIcon className="w-9 h-9" />
+          </div>
+          <span className="px-3 py-1 bg-rose-950/60 border border-rose-800/80 text-rose-300 text-[11px] font-bold rounded-full mb-3 uppercase tracking-wider">
+            Akses Terbatas
+          </span>
+          <h2 className="text-xl font-bold text-white mb-2">Hanya untuk Role Admin</h2>
+          <p className="text-xs text-slate-400 leading-relaxed mb-6">
+            Halaman Manajemen Struktur Bidang memiliki hak akses khusus dan hanya dapat dikelola oleh akun dengan role <span className="font-semibold text-amber-400 font-mono">ADMIN</span>. Akun Anda saat ini tercatat sebagai <span className="font-semibold text-slate-200 font-mono">{currentUser?.role || 'PEGAWAI'}</span>.
+          </p>
+          <a
+            href="/dashboard"
+            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs rounded-xl transition-colors shadow-lg shadow-amber-400/10 w-full"
+          >
+            Kembali ke Beranda Dashboard
+          </a>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 w-full">
@@ -99,12 +171,28 @@ export default function BidangPage() {
         />
       )}
 
-      {/* 3. Search Bar Standar */}
-      <SearchInput
-        value={searchQuery}
-        onChange={setSearchQuery}
-        placeholder="Cari nama bidang atau singkatan (misal: IPP, APD)..."
-      />
+      {/* 3. Search Bar & Filter Bar */}
+      <div className="space-y-3">
+        <SearchInput
+          value={searchQuery}
+          onChange={setSearchQuery}
+          placeholder="Cari nama bidang atau singkatan (misal: IPP, APD)..."
+        />
+
+        <TableFilterBar
+          sortOptions={[
+            { value: 'nama_asc', label: 'Nama Bidang (A-Z)' },
+            { value: 'nama_desc', label: 'Nama Bidang (Z-A)' },
+            { value: 'singkatan', label: 'Singkatan / Kode' }
+          ]}
+          selectedSort={selectedSort}
+          onSortChange={setSelectedSort}
+          onResetFilters={() => setSearchQuery('')}
+          hasActiveFilters={searchQuery !== ''}
+          totalFilteredCount={filteredList.length}
+          totalAllCount={bidangList.length}
+        />
+      </div>
 
       {/* 4. Tabel Data Bidang */}
       <div className="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden shadow-xl backdrop-blur-md">

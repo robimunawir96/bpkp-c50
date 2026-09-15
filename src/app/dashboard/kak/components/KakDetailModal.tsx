@@ -1,10 +1,10 @@
 'use client';
 
-import React from 'react';
 import {
   ClockIcon,
   CheckCircleIcon,
   UserIcon,
+  BuildingOffice2Icon,
   ArrowTopRightOnSquareIcon
 } from '@heroicons/react/24/outline';
 import { Modal } from '@/components/common';
@@ -48,13 +48,26 @@ export const KakDetailModal: React.FC<KakDetailModalProps> = ({
   return (
     <Modal isOpen={!!item} onClose={onClose} title={modalTitle} maxWidth="xl">
       <div className="space-y-4">
-        {/* Status Badge & Diberikan Oleh */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 text-xs">
+        {/* Status Badge, Diberikan Oleh & Bidang */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 text-xs">
+          <div>
+            <span className="text-slate-400 font-medium block mb-1">Bidang Kerja:</span>
+            <div className="flex items-center gap-1.5 text-white font-semibold">
+              <BuildingOffice2Icon className="w-4 h-4 text-amber-400 shrink-0" />
+              <span className="truncate">
+                {item.bidang?.nama
+                  ? item.bidang.singkatan
+                    ? `${item.bidang.nama} (${item.bidang.singkatan})`
+                    : item.bidang.nama
+                  : '-'}
+              </span>
+            </div>
+          </div>
           <div>
             <span className="text-slate-400 font-medium block mb-1">Diberikan Oleh ke Sekbid:</span>
             <div className="flex items-center gap-1.5 text-white font-semibold">
               <UserIcon className="w-4 h-4 text-blue-400 shrink-0" />
-              <span>{item.diberikanOleh || '-'}</span>
+              <span className="truncate">{item.diberikanOleh || '-'}</span>
             </div>
           </div>
           <div>

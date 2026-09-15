@@ -66,9 +66,10 @@ export const KakTable: React.FC<KakTableProps> = ({
               <th className="px-5 py-3.5 w-16 text-center">No</th>
               <th className="px-5 py-3.5 w-24 text-center">Tahun</th>
               <th className="px-5 py-3.5">Tujuan & Perihal</th>
-              <th className="px-5 py-3.5 w-56">Diberikan Oleh ke Sekbid</th>
-              <th className="px-5 py-3.5 w-44">Status</th>
-              <th className="px-5 py-3.5 w-52">Dokumen KAK</th>
+              <th className="px-5 py-3.5 w-48">Bidang Kerja</th>
+              <th className="px-5 py-3.5 w-48">Diberikan Oleh ke Sekbid</th>
+              <th className="px-5 py-3.5 w-40">Status</th>
+              <th className="px-5 py-3.5 w-44">Dokumen KAK</th>
               <th className="px-5 py-3.5 text-right w-28">Aksi</th>
             </tr>
           </thead>
@@ -104,6 +105,24 @@ export const KakTable: React.FC<KakTableProps> = ({
                         {item.perihal}
                       </p>
                     </div>
+                  </td>
+
+                  {/* Bidang Kerja */}
+                  <td className="px-5 py-4">
+                    {item.bidang ? (
+                      <div>
+                        <div className="font-medium text-slate-200 text-xs truncate max-w-[160px]" title={item.bidang.nama}>
+                          {item.bidang.nama}
+                        </div>
+                        {item.bidang.singkatan && (
+                          <span className="inline-block mt-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20 font-mono">
+                            {item.bidang.singkatan}
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-slate-500 text-[11px] italic">Belum Ditentukan</span>
+                    )}
                   </td>
 
                   {/* Diberikan Oleh ke Sekbid */}

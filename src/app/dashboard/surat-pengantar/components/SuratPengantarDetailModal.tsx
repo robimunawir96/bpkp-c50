@@ -3,7 +3,8 @@
 import React from 'react';
 import {
   CalendarDaysIcon,
-  ArrowTopRightOnSquareIcon
+  ArrowTopRightOnSquareIcon,
+  BuildingOffice2Icon
 } from '@heroicons/react/24/outline';
 import { Modal } from '@/components/common';
 import { SuratPengantarItem } from '@/lib/suratData';
@@ -58,6 +59,28 @@ export const SuratPengantarDetailModal: React.FC<SuratPengantarDetailModalProps>
               </span>
             ) : (
               <span className="text-slate-500 italic font-mono">-</span>
+            )}
+          </div>
+        </div>
+
+        {/* Bidang Kerja */}
+        <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 text-xs">
+          <span className="block text-slate-400 mb-1 flex items-center gap-1.5">
+            <BuildingOffice2Icon className="w-3.5 h-3.5 text-amber-400" />
+            <span>Bidang Kerja / Unit:</span>
+          </span>
+          <div className="text-white font-semibold text-sm">
+            {item.bidang ? (
+              <div className="flex items-center gap-2">
+                <span>{item.bidang.nama}</span>
+                {item.bidang.singkatan && (
+                  <span className="px-2 py-0.5 rounded text-xs bg-blue-500/10 text-blue-400 border border-blue-500/20 font-mono">
+                    {item.bidang.singkatan}
+                  </span>
+                )}
+              </div>
+            ) : (
+              <span className="text-slate-500 italic text-xs font-normal">Belum Ditentukan</span>
             )}
           </div>
         </div>

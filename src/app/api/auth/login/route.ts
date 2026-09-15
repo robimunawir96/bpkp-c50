@@ -40,13 +40,20 @@ export async function POST(req: Request) {
       );
     }
 
+    const userWithBidang = await prisma.user.findUnique({
+      where: { id: user.id },
+      include: { bidangRef: true }
+    });
+
     return NextResponse.json({
       success: true,
       user: {
         id: user.id,
         name: user.name,
         email: user.email,
-        bidang: user.bidang,
+        bidang: userWithBidang?.bidangRef?.nama || user.bidang || '',
+        bidangSingkatan: userWithBidang?.bidangRef?.singkatan || null,
+        bidangId: userWithBidang?.bidangId || '',
         role: user.role,
         status: userStatus
       }

@@ -1,19 +1,25 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { SparklesIcon, BuildingOffice2Icon } from '@heroicons/react/24/outline';
+import {
+  LinkIcon,
+  InboxArrowDownIcon,
+  BuildingOffice2Icon,
+  BuildingOfficeIcon,
+  CalendarDaysIcon
+} from '@heroicons/react/24/outline';
 import { Modal } from '@/components/common';
-import { NotaDinasItem, formatTanggalLengkap, parseDateToInputFormat } from '@/lib/suratData';
+import { SuratMasukItem, formatTanggalLengkap, parseDateToInputFormat } from '@/lib/suratData';
 import { useUserBidang } from '@/lib/useUserBidang';
 
-interface NotaDinasFormModalProps {
+interface SuratMasukFormModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (itemData: Omit<NotaDinasItem, 'id'>, editId?: string) => void;
-  editItem?: NotaDinasItem | null;
+  onSave: (itemData: Omit<SuratMasukItem, 'id'>, editId?: string) => void;
+  editItem?: SuratMasukItem | null;
 }
 
-export const NotaDinasFormModal: React.FC<NotaDinasFormModalProps> = ({
+export const SuratMasukFormModal: React.FC<SuratMasukFormModalProps> = ({
   isOpen,
   onClose,
   onSave,
@@ -24,12 +30,16 @@ export const NotaDinasFormModal: React.FC<NotaDinasFormModalProps> = ({
   const [bidangOptions, setBidangOptions] = useState<Array<{ id: string; nama: string; singkatan?: string | null }>>([]);
 
   const [inputTahun, setInputTahun] = useState(new Date().getFullYear().toString());
-  const [inputTanggalND, setInputTanggalND] = useState('');
+  const [inputTanggalSuratMasuk, setInputTanggalSuratMasuk] = useState('');
+  const [inputTanggalDiterimaSekbid, setInputTanggalDiterimaSekbid] = useState('');
+  const [inputTanggalDikirimKeSekper, setInputTanggalDikirimKeSekper] = useState('');
+
   const [formData, setFormData] = useState({
     bidangId: '',
-    noND: '',
-    yangMeminta: '',
-    perihal: ''
+    noSuratMasuk: '',
+    instansiPengirim: '',
+    perihal: '',
+    linkDrive: ''
   });
 
   useEffect(() => {
@@ -46,38 +56,49 @@ export const NotaDinasFormModal: React.FC<NotaDinasFormModalProps> = ({
   useEffect(() => {
     if (editItem) {
       setInputTahun(editItem.tahun || new Date().getFullYear().toString());
-      setInputTanggalND(parseDateToInputFormat(editItem.tanggalND || ''));
+      setInputTanggalSuratMasuk(parseDateToInputFormat(editItem.tanggalSuratMasuk || ''));
+      setInputTanggalDiterimaSekbid(parseDateToInputFormat(editItem.tanggalDiterimaSekbid || ''));
+      setInputTanggalDikirimKeSekper(parseDateToInputFormat(editItem.tanggalDikirimKeSekper || ''));
       setFormData({
         bidangId: editItem.bidangId || (editItem.bidang?.id ?? (userBidang.bidangId || '')),
-        noND: editItem.noND || '',
-        yangMeminta: editItem.yangMeminta || '',
-        perihal: editItem.perihal || ''
+        noSuratMasuk: editItem.noSuratMasuk || '',
+        instansiPengirim: editItem.instansiPengirim || '',
+        perihal: editItem.perihal || '',
+        linkDrive: editItem.linkDrive || ''
       });
     } else {
       setInputTahun(new Date().getFullYear().toString());
-      setInputTanggalND('');
+      setInputTanggalSuratMasuk('');
+      setInputTanggalDiterimaSekbid('');
+      setInputTanggalDikirimKeSekper('');
       setFormData({
         bidangId: userBidang.bidangId || '',
-        noND: '',
-        yangMeminta: '',
-        perihal: ''
+        noSuratMasuk: '',
+        instansiPengirim: '',
+        perihal: '',
+        linkDrive: ''
       });
     }
   }, [editItem, isOpen, userBidang.bidangId]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.yangMeminta.trim()) return;
+    if (!formData.noSuratMasuk.trim() || !formData.instansiPengirim.trim() || !formData.perihal.trim()) return;
 
-    const tanggalNDFormatted = formatTanggalLengkap(inputTanggalND);
+    const tglSuratMasukFormatted = inputTanggalSuratMasuk ? formatTanggalLengkap(inputTanggalSuratMasuk) : '-';
+    const tglDiterimaSekbidFormatted = inputTanggalDiterimaSekbid ? formatTanggalLengkap(inputTanggalDiterimaSekbid) : '-';
+    const tglDikirimKeSekperFormatted = inputTanggalDikirimKeSekper ? formatTanggalLengkap(inputTanggalDikirimKeSekper) : '-';
 
-    const itemData: Omit<NotaDinasItem, 'id'> = {
+    const itemData: Omit<SuratMasukItem, 'id'> = {
       tahun: inputTahun || new Date().getFullYear().toString(),
       bidangId: formData.bidangId || null,
-      noND: formData.noND.trim(),
-      tanggalND: tanggalNDFormatted,
-      yangMeminta: formData.yangMeminta.trim(),
-      perihal: formData.perihal.trim()
+      noSuratMasuk: formData.noSuratMasuk.trim(),
+      tanggalSuratMasuk: tglSuratMasukFormatted,
+      instansiPengirim: formData.instansiPengirim.trim(),
+      perihal: formData.perihal.trim(),
+      tanggalDiterimaSekbid: tglDiterimaSekbidFormatted,
+      tanggalDikirimKeSekper: tglDikirimKeSekperFormatted,
+      linkDrive: formData.linkDrive.trim()
     };
 
     onSave(itemData, editItem ? editItem.id : undefined);
@@ -86,15 +107,15 @@ export const NotaDinasFormModal: React.FC<NotaDinasFormModalProps> = ({
 
   const modalTitle = (
     <div className="flex items-center gap-2">
-      <SparklesIcon className="w-5 h-5 text-amber-400" />
-      <span>{editItem ? 'Edit Nota Dinas' : 'Tambah Nota Dinas Baru'}</span>
+      <InboxArrowDownIcon className="w-5 h-5 text-amber-400" />
+      <span>{editItem ? 'Edit Surat Masuk' : 'Tambah Surat Masuk Baru'}</span>
     </div>
   );
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={modalTitle} maxWidth="xl">
+    <Modal isOpen={isOpen} onClose={onClose} title={modalTitle} maxWidth="2xl">
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Tahun & Tanggal ND */}
+        {/* Tahun & Tanggal Surat Masuk */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-semibold text-slate-300 mb-1.5">
@@ -113,20 +134,18 @@ export const NotaDinasFormModal: React.FC<NotaDinasFormModalProps> = ({
           </div>
           <div>
             <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-              Tanggal Nota Dinas <span className="text-rose-400">*</span>
+              Tanggal Surat Masuk <span className="text-rose-400">*</span>
             </label>
             <input
               type="date"
               required
-              value={inputTanggalND}
+              value={inputTanggalSuratMasuk}
               onChange={(e) => {
                 const val = e.target.value;
-                setInputTanggalND(val);
-                if (!editItem && val) {
-                  const extractedYear = new Date(val).getFullYear();
-                  if (!isNaN(extractedYear)) {
-                    setInputTahun(extractedYear.toString());
-                  }
+                setInputTanggalSuratMasuk(val);
+                if (val && !editItem) {
+                  const y = val.split('-')[0];
+                  if (y && y.length === 4) setInputTahun(y);
                 }
               }}
               className="w-full px-3.5 py-2.5 bg-slate-950/80 border border-slate-800 rounded-xl text-xs sm:text-sm text-white focus:outline-none focus:border-amber-400"
@@ -139,7 +158,7 @@ export const NotaDinasFormModal: React.FC<NotaDinasFormModalProps> = ({
           <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center justify-between">
             <span className="flex items-center gap-1.5">
               <BuildingOffice2Icon className="w-3.5 h-3.5 text-amber-400" />
-              <span>Bidang Kerja</span>
+              <span>Bidang Kerja / Unit</span>
             </span>
             <span className="text-[10px] text-amber-400/90 font-mono bg-amber-400/10 px-1.5 py-0.5 rounded border border-amber-400/20">
               {isAdmin ? 'Pilihan Administrator' : 'Otomatis sesuai akun'}
@@ -173,46 +192,92 @@ export const NotaDinasFormModal: React.FC<NotaDinasFormModalProps> = ({
           <input type="hidden" name="bidangId" value={formData.bidangId} />
         </div>
 
-        {/* Nomor ND */}
+        {/* Nomor Surat Masuk */}
         <div>
           <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-            Nomor Nota Dinas (ND) <span className="text-slate-500 font-normal">(Opsional)</span>
-          </label>
-          <input
-            type="text"
-            value={formData.noND}
-            onChange={(e) => setFormData({ ...formData, noND: e.target.value })}
-            className="w-full px-3.5 py-2.5 bg-slate-950/80 border border-slate-800 rounded-xl text-xs sm:text-sm text-white focus:outline-none focus:border-amber-400 font-mono"
-            placeholder="Contoh: ND-01/PW10/1/2026"
-          />
-        </div>
-
-        {/* Yang Meminta */}
-        <div>
-          <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-            Yang Meminta <span className="text-rose-400">*</span>
+            Nomor Surat Masuk <span className="text-rose-400">*</span>
           </label>
           <input
             type="text"
             required
-            value={formData.yangMeminta}
-            onChange={(e) => setFormData({ ...formData, yangMeminta: e.target.value })}
+            value={formData.noSuratMasuk}
+            onChange={(e) => setFormData({ ...formData, noSuratMasuk: e.target.value })}
+            className="w-full px-3.5 py-2.5 bg-slate-950/80 border border-slate-800 rounded-xl text-xs sm:text-sm text-white focus:outline-none focus:border-amber-400 font-mono"
+            placeholder="Contoh: 005/1234/Disdik/2026"
+          />
+        </div>
+
+        {/* Instansi yang Mengirim Surat */}
+        <div>
+          <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
+            <BuildingOfficeIcon className="w-4 h-4 text-amber-400" />
+            <span>Instansi yang Mengirim Surat <span className="text-rose-400">*</span></span>
+          </label>
+          <input
+            type="text"
+            required
+            value={formData.instansiPengirim}
+            onChange={(e) => setFormData({ ...formData, instansiPengirim: e.target.value })}
             className="w-full px-3.5 py-2.5 bg-slate-950/80 border border-slate-800 rounded-xl text-xs sm:text-sm text-white focus:outline-none focus:border-amber-400"
-            placeholder="Contoh: Korwas Bidang IPP / Bagian Tata Usaha"
+            placeholder="Contoh: Dinas Pendidikan Provinsi Jawa Barat / Inspektorat Daerah"
           />
         </div>
 
         {/* Perihal */}
         <div>
           <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-            Perihal / Uraian Nota Dinas <span className="text-slate-500 font-normal">(Opsional)</span>
+            Perihal Surat Masuk <span className="text-rose-400">*</span>
           </label>
           <textarea
+            required
             rows={3}
             value={formData.perihal}
             onChange={(e) => setFormData({ ...formData, perihal: e.target.value })}
             className="w-full px-3.5 py-2.5 bg-slate-950/80 border border-slate-800 rounded-xl text-xs sm:text-sm text-white focus:outline-none focus:border-amber-400 leading-relaxed"
-            placeholder="Tuliskan perihal atau ringkasan nota dinas jika ada..."
+            placeholder="Tuliskan uraian atau perihal surat masuk..."
+          />
+        </div>
+
+        {/* Tanggal Diterima Sekbid & Tanggal Dikirim ke Sekper */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
+              <CalendarDaysIcon className="w-3.5 h-3.5 text-amber-400" />
+              <span>Tanggal Diterima Sekbid <span className="text-slate-500 font-normal">(Opsional)</span></span>
+            </label>
+            <input
+              type="date"
+              value={inputTanggalDiterimaSekbid}
+              onChange={(e) => setInputTanggalDiterimaSekbid(e.target.value)}
+              className="w-full px-3.5 py-2.5 bg-slate-950/80 border border-slate-800 rounded-xl text-xs sm:text-sm text-white focus:outline-none focus:border-amber-400"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
+              <CalendarDaysIcon className="w-3.5 h-3.5 text-sky-400" />
+              <span>Tanggal Dikirim ke Sekper <span className="text-slate-500 font-normal">(Opsional)</span></span>
+            </label>
+            <input
+              type="date"
+              value={inputTanggalDikirimKeSekper}
+              onChange={(e) => setInputTanggalDikirimKeSekper(e.target.value)}
+              className="w-full px-3.5 py-2.5 bg-slate-950/80 border border-slate-800 rounded-xl text-xs sm:text-sm text-white focus:outline-none focus:border-amber-400"
+            />
+          </div>
+        </div>
+
+        {/* Link Google Drive */}
+        <div>
+          <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
+            <LinkIcon className="w-4 h-4 text-blue-400" />
+            <span>Link Google Drive <span className="text-slate-500 font-normal">(Opsional)</span></span>
+          </label>
+          <input
+            type="url"
+            value={formData.linkDrive}
+            onChange={(e) => setFormData({ ...formData, linkDrive: e.target.value })}
+            className="w-full px-3.5 py-2.5 bg-slate-950/80 border border-slate-800 rounded-xl text-xs sm:text-sm text-white focus:outline-none focus:border-amber-400"
+            placeholder="https://drive.google.com/file/d/..."
           />
         </div>
 
@@ -229,7 +294,7 @@ export const NotaDinasFormModal: React.FC<NotaDinasFormModalProps> = ({
             type="submit"
             className="px-5 py-2.5 rounded-xl text-xs font-bold text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 shadow-md transition-all"
           >
-            {editItem ? 'Simpan Perubahan' : 'Simpan Nota Dinas'}
+            {editItem ? 'Simpan Perubahan' : 'Simpan Surat Masuk'}
           </button>
         </div>
       </form>

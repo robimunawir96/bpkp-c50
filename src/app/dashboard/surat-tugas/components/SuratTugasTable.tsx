@@ -41,6 +41,7 @@ export const SuratTugasTable: React.FC<SuratTugasTableProps> = ({
             <tr className="border-b border-slate-800 bg-slate-900/90 text-[11px] font-bold tracking-wider text-slate-400 uppercase">
               <th className="px-4 py-3.5 w-16 text-center">Tahun</th>
               <th className="px-4 py-3.5 w-56">Nomor Identitas</th>
+              <th className="px-4 py-3.5 w-44">Bidang Kerja</th>
               <th className="px-4 py-3.5 w-44">Tgl Surat</th>
               <th className="px-4 py-3.5">Tujuan & Perihal</th>
               <th className="px-4 py-3.5 w-56">Waktu Pelaksanaan</th>
@@ -85,6 +86,24 @@ export const SuratTugasTable: React.FC<SuratTugasTableProps> = ({
                       )}
                     </div>
                   </div>
+                </td>
+
+                {/* Bidang Kerja */}
+                <td className="px-4 py-4">
+                  {item.bidang ? (
+                    <div>
+                      <div className="font-medium text-slate-200 text-xs truncate max-w-[160px]" title={item.bidang.nama}>
+                        {item.bidang.nama}
+                      </div>
+                      {item.bidang.singkatan && (
+                        <span className="inline-block mt-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20 font-mono">
+                          {item.bidang.singkatan}
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-slate-500 text-[11px] italic">Belum Ditentukan</span>
+                  )}
                 </td>
 
                 {/* Tanggal Surat */}

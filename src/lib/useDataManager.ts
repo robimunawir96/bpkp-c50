@@ -148,9 +148,10 @@ export function useDataManager<T extends { id: string }>({
   const saveItem = useCallback(
     async (itemData: Omit<T, 'id'>, editId?: string) => {
       if (apiEndpoint) {
+        const baseUrl = apiEndpoint.split('?')[0];
         try {
           if (editId) {
-            const res = await fetch(apiEndpoint, {
+            const res = await fetch(baseUrl, {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ id: editId, ...itemData })
@@ -164,7 +165,7 @@ export function useDataManager<T extends { id: string }>({
               return;
             }
           } else {
-            const res = await fetch(apiEndpoint, {
+            const res = await fetch(baseUrl, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(itemData)
@@ -179,7 +180,7 @@ export function useDataManager<T extends { id: string }>({
             }
           }
         } catch (err) {
-          console.error(`Error saving to ${apiEndpoint}:`, err);
+          console.error(`Error saving to ${baseUrl}:`, err);
           showNotification('Gagal menyimpan data ke database server.', 'error');
         }
       }
@@ -216,8 +217,9 @@ export function useDataManager<T extends { id: string }>({
     const title = getItemTitle(deletingItem);
 
     if (apiEndpoint) {
+      const baseUrl = apiEndpoint.split('?')[0];
       try {
-        const res = await fetch(`${apiEndpoint}?id=${deletingItem.id}`, {
+        const res = await fetch(`${baseUrl}?id=${deletingItem.id}`, {
           method: 'DELETE'
         });
         if (res.ok) {
@@ -227,7 +229,7 @@ export function useDataManager<T extends { id: string }>({
           return;
         }
       } catch (err) {
-        console.error(`Error deleting from ${apiEndpoint}:`, err);
+        console.error(`Error deleting from ${baseUrl}:`, err);
         showNotification('Gagal menghapus data dari database server.', 'error');
       }
     }

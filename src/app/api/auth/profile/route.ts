@@ -23,7 +23,8 @@ export async function GET(req: Request) {
         ]
       },
       include: {
-        bidangRef: true
+        bidangRef: true,
+        pendingBidangRef: true
       }
     });
 
@@ -39,6 +40,9 @@ export async function GET(req: Request) {
       bidang: user.bidangRef?.nama || user.bidang || '',
       bidangSingkatan: user.bidangRef?.singkatan || null,
       bidangId: user.bidangId || '',
+      pendingBidangId: user.pendingBidangId || null,
+      pendingBidangNama: user.pendingBidangRef?.nama || null,
+      pendingBidangSingkatan: user.pendingBidangRef?.singkatan || null,
       role: user.role,
       avatarUrl: user.avatarUrl || '',
       status: (user as any).status || 'APPROVED',
@@ -94,10 +98,33 @@ export async function PUT(req: Request) {
       updatePasswordHash = newPassword;
     }
 
-    let resolvedBidangName = undefined;
-    if (bidangId) {
-      const b = await prisma.bidang.findUnique({ where: { id: bidangId } });
-      if (b) resolvedBidangName = b.nama;
+    let isBidangChanged = false;
+    let pendingBidangPayload: any = {};
+    let directBidangPayload: any = {};
+
+    if (bidangId !== undefined) {
+      const currentBidangId = user.bidangId || '';
+      const requestedBidangId = bidangId || '';
+
+      // Jika user adalah ADMIN, perubahan bidang langsung disetujui & diterapkan
+      if (user.role === 'ADMIN') {
+        let resolvedBidangName = null;
+        if (requestedBidangId) {
+          const b = await prisma.bidang.findUnique({ where: { id: requestedBidangId } });
+          if (b) resolvedBidangName = b.nama;
+        }
+        directBidangPayload = {
+          bidangId: requestedBidangId || null,
+          bidang: resolvedBidangName,
+          pendingBidangId: null
+        };
+      } else if (requestedBidangId !== currentBidangId) {
+        // Jika PEGAWAI, set sebagai pendingBidangId menunggu approval admin
+        isBidangChanged = true;
+        pendingBidangPayload = {
+          pendingBidangId: requestedBidangId || null
+        };
+      }
     }
 
     const updatedUser = await prisma.user.update({
@@ -105,18 +132,25 @@ export async function PUT(req: Request) {
       data: {
         ...(name ? { name } : {}),
         ...(phoneNumber !== undefined ? { phoneNumber: phoneNumber || null } : {}),
-        ...(bidangId ? { bidangId, bidang: resolvedBidangName } : {}),
+        ...directBidangPayload,
+        ...pendingBidangPayload,
         ...(avatarUrl !== undefined ? { avatarUrl: avatarUrl || null } : {}),
         ...(updatePasswordHash ? { passwordHash: updatePasswordHash } : {})
       },
       include: {
-        bidangRef: true
+        bidangRef: true,
+        pendingBidangRef: true
       }
     });
 
+    const isPendingApproval = Boolean(isBidangChanged && user.role !== 'ADMIN');
+
     return NextResponse.json({
       success: true,
-      message: 'Profil berhasil diperbarui.',
+      message: isPendingApproval
+        ? 'Profil berhasil diperbarui. Permintaan perubahan bidang telah dikirim dan menunggu persetujuan Administrator.'
+        : 'Profil berhasil diperbarui.',
+      isPendingApproval,
       user: {
         id: updatedUser.id,
         name: updatedUser.name,
@@ -125,6 +159,9 @@ export async function PUT(req: Request) {
         bidang: updatedUser.bidangRef?.nama || updatedUser.bidang || '',
         bidangSingkatan: updatedUser.bidangRef?.singkatan || null,
         bidangId: updatedUser.bidangId || '',
+        pendingBidangId: updatedUser.pendingBidangId || null,
+        pendingBidangNama: updatedUser.pendingBidangRef?.nama || null,
+        pendingBidangSingkatan: updatedUser.pendingBidangRef?.singkatan || null,
         role: updatedUser.role,
         avatarUrl: updatedUser.avatarUrl || '',
         status: (updatedUser as any).status || 'APPROVED'

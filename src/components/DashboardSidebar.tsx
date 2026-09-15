@@ -11,6 +11,7 @@ import {
   DocumentCheckIcon,
   DocumentTextIcon,
   DocumentChartBarIcon,
+  InboxArrowDownIcon,
   ShieldCheckIcon,
   UserGroupIcon,
   UserCircleIcon,
@@ -24,9 +25,11 @@ export default function DashboardSidebar() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const [currentUser, setCurrentUser] = useState<{ name?: string; email?: string } | null>(null);
+  const [currentUser, setCurrentUser] = useState<{ name?: string; email?: string; role?: string } | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
 
   React.useEffect(() => {
+    setIsMounted(true);
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('bpkp_auth_user');
       if (stored) {
@@ -52,28 +55,26 @@ export default function DashboardSidebar() {
       icon: UserCircleIcon,
       exact: false
     },
-    {
-      name: 'Pegawai',
-      href: '/dashboard/pegawai',
-      icon: UserGroupIcon,
-      exact: false
-    },
-    {
-      name: 'KAK',
-      href: '/dashboard/kak',
-      icon: DocumentChartBarIcon,
-      exact: false
-    },
+    ...(isMounted && currentUser?.role !== 'ADMIN'
+      ? []
+      : [
+          {
+            name: 'Manajemen Akun',
+            href: '/dashboard/manajemen-akun',
+            icon: UserGroupIcon,
+            exact: false
+          },
+          {
+            name: 'Bidang',
+            href: '/dashboard/bidang',
+            icon: FolderIcon,
+            exact: false
+          }
+        ]),
     {
       name: 'Surat Tugas',
       href: '/dashboard/surat-tugas',
       icon: ClipboardDocumentListIcon,
-      exact: false
-    },
-    {
-      name: 'Nota Dinas',
-      href: '/dashboard/nota-dinas',
-      icon: DocumentDuplicateIcon,
       exact: false
     },
     {
@@ -89,9 +90,21 @@ export default function DashboardSidebar() {
       exact: false
     },
     {
-      name: 'Bidang',
-      href: '/dashboard/bidang',
-      icon: FolderIcon,
+      name: 'Surat Masuk',
+      href: '/dashboard/surat-masuk',
+      icon: InboxArrowDownIcon,
+      exact: false
+    },
+    {
+      name: 'KAK',
+      href: '/dashboard/kak',
+      icon: DocumentChartBarIcon,
+      exact: false
+    },
+    {
+      name: 'Nota Dinas',
+      href: '/dashboard/nota-dinas',
+      icon: DocumentDuplicateIcon,
       exact: false
     }
   ];

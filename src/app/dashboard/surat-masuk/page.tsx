@@ -2,10 +2,8 @@
 
 import React, { useState, useMemo } from 'react';
 import {
-  LhpItem,
-  SuratTugasItem,
-  INITIAL_LHP,
-  INITIAL_SURAT_TUGAS,
+  SuratMasukItem,
+  INITIAL_SURAT_MASUK,
   STORAGE_KEYS,
   parseDateToTimestamp
 } from '@/lib/suratData';
@@ -20,31 +18,25 @@ import {
   TableFilterBar
 } from '@/components/common';
 import {
-  LhpTable,
-  LhpFormModal,
-  LhpDetailModal
+  SuratMasukTable,
+  SuratMasukFormModal,
+  SuratMasukDetailModal
 } from './components';
 
-export type { LhpItem };
+export type { SuratMasukItem };
 
-export default function LhpPage() {
+export default function SuratMasukPage() {
   const userBidang = useUserBidang();
   const [adminBidangFilter, setAdminBidangFilter] = useState('ALL');
 
-  const lhpApiEndpoint = userBidang.isLoading
+  const apiEndpoint = userBidang.isLoading
     ? undefined
     : userBidang.userRole === 'ADMIN'
-    ? '/api/lhp'
-    : `/api/lhp?bidangId=${encodeURIComponent(userBidang.bidangId || 'none')}&role=${encodeURIComponent(userBidang.userRole || 'PEGAWAI')}`;
-
-  const stApiEndpoint = userBidang.isLoading
-    ? undefined
-    : userBidang.userRole === 'ADMIN'
-    ? '/api/surat-tugas'
-    : `/api/surat-tugas?bidangId=${encodeURIComponent(userBidang.bidangId || 'none')}&role=${encodeURIComponent(userBidang.userRole || 'PEGAWAI')}`;
+    ? '/api/surat-masuk'
+    : `/api/surat-masuk?bidangId=${encodeURIComponent(userBidang.bidangId || 'none')}&role=${encodeURIComponent(userBidang.userRole || 'PEGAWAI')}`;
 
   const {
-    data: lhpList,
+    data: smList,
     searchQuery,
     setSearchQuery,
     isFormOpen,
@@ -62,11 +54,11 @@ export default function LhpPage() {
     closeDelete,
     saveItem,
     deleteItem
-  } = useDataManager<LhpItem>({
-    storageKey: STORAGE_KEYS.LHP,
-    initialData: INITIAL_LHP,
-    apiEndpoint: lhpApiEndpoint,
-    getItemTitle: (item) => item.noLHP || item.tujuan
+  } = useDataManager<SuratMasukItem>({
+    storageKey: STORAGE_KEYS.SURAT_MASUK,
+    initialData: INITIAL_SURAT_MASUK,
+    apiEndpoint,
+    getItemTitle: (item) => `${item.noSuratMasuk} - ${item.instansiPengirim}`
   });
 
   // Filter States
@@ -78,37 +70,18 @@ export default function LhpPage() {
   const yearOptions = useMemo(() => {
     const years = Array.from(
       new Set(
-        lhpList
+        smList
           .map((item) => item.tahun?.trim())
           .filter((y): y is string => Boolean(y && y !== ''))
       )
     ).sort((a, b) => b.localeCompare(a));
     return years;
-  }, [lhpList]);
-
-  // Ambil data Surat Tugas untuk relasi No S (terfilter bidang)
-  const { data: rawSuratTugasList } = useDataManager<SuratTugasItem>({
-    storageKey: STORAGE_KEYS.SURAT_TUGAS,
-    initialData: INITIAL_SURAT_TUGAS,
-    apiEndpoint: stApiEndpoint,
-    getItemTitle: (item) => item.noST || item.tujuan
-  });
-
-  // Filter Surat Tugas untuk dropdown relasi modal
-  const suratTugasList = useMemo(() => {
-    if (userBidang.userRole !== 'ADMIN') {
-      if (!userBidang.bidangId) return [];
-      return rawSuratTugasList.filter(
-        (st) => (st.bidangId || st.bidang?.id) === userBidang.bidangId || st.bidang?.nama === userBidang.bidangNama
-      );
-    }
-    return rawSuratTugasList;
-  }, [rawSuratTugasList, userBidang]);
+  }, [smList]);
 
   // Filter pencarian & hak akses bidang
   const filteredList = useMemo(() => {
     const q = searchQuery.toLowerCase();
-    const result = lhpList.filter((item) => {
+    const result = smList.filter((item) => {
       // 1. Filter hak akses Bidang
       if (userBidang.userRole !== 'ADMIN') {
         if (!userBidang.bidangId) return false;
@@ -137,11 +110,12 @@ export default function LhpPage() {
       // 4. Filter Search Query
       return (
         (item.tahun && item.tahun.toLowerCase().includes(q)) ||
-        (item.noS && item.noS.toLowerCase().includes(q)) ||
-        (item.noLHP && item.noLHP.toLowerCase().includes(q)) ||
-        (item.tujuan && item.tujuan.toLowerCase().includes(q)) ||
+        (item.noSuratMasuk && item.noSuratMasuk.toLowerCase().includes(q)) ||
+        (item.instansiPengirim && item.instansiPengirim.toLowerCase().includes(q)) ||
         (item.perihal && item.perihal.toLowerCase().includes(q)) ||
-        (item.tanggalLHP && item.tanggalLHP.toLowerCase().includes(q)) ||
+        (item.tanggalSuratMasuk && item.tanggalSuratMasuk.toLowerCase().includes(q)) ||
+        (item.tanggalDiterimaSekbid && item.tanggalDiterimaSekbid.toLowerCase().includes(q)) ||
+        (item.tanggalDikirimKeSekper && item.tanggalDikirimKeSekper.toLowerCase().includes(q)) ||
         (item.bidang?.nama && item.bidang.nama.toLowerCase().includes(q)) ||
         (item.bidang?.singkatan && item.bidang.singkatan.toLowerCase().includes(q))
       );
@@ -152,28 +126,28 @@ export default function LhpPage() {
       if (selectedSort === 'newest') {
         const yearDiff = (parseInt(b.tahun || '0', 10) || 0) - (parseInt(a.tahun || '0', 10) || 0);
         if (yearDiff !== 0) return yearDiff;
-        const dateDiff = parseDateToTimestamp(b.tanggalLHP) - parseDateToTimestamp(a.tanggalLHP);
+        const dateDiff = parseDateToTimestamp(b.tanggalSuratMasuk) - parseDateToTimestamp(a.tanggalSuratMasuk);
         if (dateDiff !== 0) return dateDiff;
         return (b.createdAt || '').localeCompare(a.createdAt || '');
       }
       if (selectedSort === 'oldest') {
         const yearDiff = (parseInt(a.tahun || '0', 10) || 0) - (parseInt(b.tahun || '0', 10) || 0);
         if (yearDiff !== 0) return yearDiff;
-        const dateDiff = parseDateToTimestamp(a.tanggalLHP) - parseDateToTimestamp(b.tanggalLHP);
+        const dateDiff = parseDateToTimestamp(a.tanggalSuratMasuk) - parseDateToTimestamp(b.tanggalSuratMasuk);
         if (dateDiff !== 0) return dateDiff;
         return (a.createdAt || '').localeCompare(b.createdAt || '');
       }
-      if (selectedSort === 'tujuan_asc') {
-        return (a.tujuan || '').localeCompare(b.tujuan || '');
+      if (selectedSort === 'instansi_asc') {
+        return (a.instansiPengirim || '').localeCompare(b.instansiPengirim || '');
       }
-      if (selectedSort === 'no_lhp') {
-        return (a.noLHP || '').localeCompare(b.noLHP || '');
+      if (selectedSort === 'no_surat') {
+        return (a.noSuratMasuk || '').localeCompare(b.noSuratMasuk || '');
       }
       return 0;
     });
 
     return result;
-  }, [lhpList, searchQuery, userBidang, adminBidangFilter, selectedYear, selectedDriveFilter, selectedSort]);
+  }, [smList, searchQuery, userBidang, adminBidangFilter, selectedYear, selectedDriveFilter, selectedSort]);
 
   const hasActiveFilters = selectedYear !== 'ALL' || selectedDriveFilter !== 'ALL' || searchQuery !== '';
 
@@ -187,10 +161,10 @@ export default function LhpPage() {
     <div className="space-y-6 w-full">
       {/* 1. Header Standar */}
       <PageHeader
-        badgeText="Manajemen Dokumen Pengawasan"
-        title="Laporan Hasil Pengawasan (LHP)"
-        description="Kelola dan pantau seluruh berkas Laporan Hasil Pengawasan (LHP) BPKP Jawa Barat."
-        addButtonLabel="+ Tambah LHP"
+        badgeText="Manajemen Persuratan"
+        title="Surat Masuk"
+        description="Kelola dan pantau seluruh Surat Masuk dari instansi luar beserta disposisi ke Sekbid dan Sekper."
+        addButtonLabel="+ Tambah Surat Masuk"
         onAddClick={openAdd}
       />
 
@@ -216,7 +190,7 @@ export default function LhpPage() {
         <SearchInput
           value={searchQuery}
           onChange={setSearchQuery}
-          placeholder="Cari berdasarkan No S, No LHP, Tujuan, Perihal, atau Tahun..."
+          placeholder="Cari berdasarkan No Surat Masuk, Instansi Pengirim, Perihal, Bidang, atau Tahun..."
         />
 
         <TableFilterBar
@@ -239,20 +213,20 @@ export default function LhpPage() {
           sortOptions={[
             { value: 'newest', label: 'Tahun / Tanggal Terbaru' },
             { value: 'oldest', label: 'Tahun / Tanggal Terlama' },
-            { value: 'tujuan_asc', label: 'Nama Tujuan (A-Z)' },
-            { value: 'no_lhp', label: 'Nomor LHP' }
+            { value: 'instansi_asc', label: 'Nama Instansi (A-Z)' },
+            { value: 'no_surat', label: 'Nomor Surat Masuk' }
           ]}
           selectedSort={selectedSort}
           onSortChange={setSelectedSort}
           onResetFilters={handleResetFilters}
           hasActiveFilters={hasActiveFilters}
           totalFilteredCount={filteredList.length}
-          totalAllCount={lhpList.length}
+          totalAllCount={smList.length}
         />
       </div>
 
       {/* 4. Table Komponen */}
-      <LhpTable
+      <SuratMasukTable
         items={filteredList}
         onShow={openDetail}
         onEdit={openEdit}
@@ -260,16 +234,15 @@ export default function LhpPage() {
       />
 
       {/* 5. Modal Form Tambah / Edit */}
-      <LhpFormModal
+      <SuratMasukFormModal
         isOpen={isFormOpen}
         onClose={closeForm}
         onSave={saveItem}
         editItem={editingItem}
-        suratTugasList={suratTugasList}
       />
 
       {/* 6. Modal Detail / Show */}
-      <LhpDetailModal
+      <SuratMasukDetailModal
         item={detailItem}
         onClose={closeDetail}
       />
@@ -279,9 +252,9 @@ export default function LhpPage() {
         isOpen={!!deletingItem}
         onClose={closeDelete}
         onConfirm={deleteItem}
-        title="Hapus LHP"
-        itemName={deletingItem ? `${deletingItem.noLHP || deletingItem.noS || 'LHP Tanpa Nomor'} - ${deletingItem.tujuan}` : ''}
-        description="Apakah Anda yakin ingin menghapus data LHP ini? Tindakan ini akan menghapus data secara permanen."
+        title="Hapus Surat Masuk"
+        itemName={deletingItem ? `${deletingItem.noSuratMasuk} - ${deletingItem.instansiPengirim}` : ''}
+        description="Apakah Anda yakin ingin menghapus data Surat Masuk ini? Tindakan ini akan menghapus data secara permanen."
       />
     </div>
   );

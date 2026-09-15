@@ -5,7 +5,8 @@ export async function GET() {
   try {
     const users = await prisma.user.findMany({
       include: {
-        bidangRef: true
+        bidangRef: true,
+        pendingBidangRef: true
       },
       orderBy: { createdAt: 'desc' }
     });
@@ -19,6 +20,9 @@ export async function GET() {
       bidang: u.bidangRef?.nama || u.bidang || '-',
       bidangSingkatan: u.bidangRef?.singkatan || null,
       bidangId: u.bidangId || '',
+      pendingBidangId: u.pendingBidangId || null,
+      pendingBidangNama: u.pendingBidangRef?.nama || null,
+      pendingBidangSingkatan: u.pendingBidangRef?.singkatan || null,
       role: u.role,
       status: (u as any).status || 'APPROVED',
       avatarUrl: u.avatarUrl,
@@ -110,6 +114,7 @@ export async function PUT(req: Request) {
         phoneNumber: body.phoneNumber || null,
         bidangId: body.bidangId || null,
         bidang: resolvedBidangName || null,
+        pendingBidangId: null,
         role: body.role === 'ADMIN' ? 'ADMIN' : 'PEGAWAI',
         ...(body.status ? { status: body.status } : {}),
         ...(body.password ? { passwordHash: body.password } : {})

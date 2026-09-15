@@ -1,10 +1,27 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const { searchParams } = new URL(req.url);
+    const bidangId = searchParams.get('bidangId');
+    const role = searchParams.get('role');
+
+    const where: any = {};
+    if (role && role !== 'ADMIN') {
+      if (bidangId && bidangId !== 'none') {
+        where.bidangId = bidangId;
+      } else {
+        where.bidangId = '__NONE__';
+      }
+    } else if (bidangId && bidangId !== 'ALL') {
+      where.bidangId = bidangId;
+    }
+
     const data = await prisma.kak.findMany({
+      where,
       include: {
+        bidang: true,
         statusHistory: {
           orderBy: { createdAt: 'desc' }
         }
@@ -24,6 +41,7 @@ export async function POST(req: Request) {
     const created = await prisma.kak.create({
       data: {
         tahun: body.tahun || new Date().getFullYear().toString(),
+        bidangId: body.bidangId || null,
         tujuan: body.tujuan || '',
         perihal: body.perihal || '',
         diberikanOleh: body.diberikanOleh || null,
@@ -56,6 +74,7 @@ export async function POST(req: Request) {
         }
       },
       include: {
+        bidang: true,
         statusHistory: true
       }
     });
@@ -84,6 +103,7 @@ export async function PUT(req: Request) {
       where: { id: body.id },
       data: {
         tahun: body.tahun,
+        bidangId: body.bidangId !== undefined ? body.bidangId || null : undefined,
         tujuan: body.tujuan,
         perihal: body.perihal,
         diberikanOleh: body.diberikanOleh,
@@ -109,6 +129,7 @@ export async function PUT(req: Request) {
           : {})
       },
       include: {
+        bidang: true,
         statusHistory: {
           orderBy: { createdAt: 'desc' }
         }

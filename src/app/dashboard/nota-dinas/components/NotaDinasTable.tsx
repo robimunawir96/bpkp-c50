@@ -38,9 +38,10 @@ export const NotaDinasTable: React.FC<NotaDinasTableProps> = ({
           <thead>
             <tr className="border-b border-slate-800 bg-slate-900/90 text-[11px] font-bold tracking-wider text-slate-400 uppercase">
               <th className="px-4 py-3.5 w-16 text-center">Tahun</th>
-              <th className="px-4 py-3.5 w-52">Nomor ND</th>
-              <th className="px-4 py-3.5 w-44">Tgl ND</th>
-              <th className="px-4 py-3.5 w-60">Yang Meminta</th>
+              <th className="px-4 py-3.5 w-48">Nomor ND</th>
+              <th className="px-4 py-3.5 w-44">Bidang Kerja</th>
+              <th className="px-4 py-3.5 w-36">Tgl ND</th>
+              <th className="px-4 py-3.5 w-52">Yang Meminta</th>
               <th className="px-4 py-3.5">Perihal</th>
               <th className="px-4 py-3.5 text-right w-28">Aksi</th>
             </tr>
@@ -67,6 +68,17 @@ export const NotaDinasTable: React.FC<NotaDinasTableProps> = ({
                   ) : (
                     <span className="text-slate-600 text-[11px] italic font-mono">-</span>
                   )}
+                </td>
+
+                {/* Bidang Kerja */}
+                <td className="px-4 py-4">
+                  <span className="text-slate-300 font-medium">
+                    {item.bidang?.nama ? (
+                      item.bidang.singkatan ? `${item.bidang.nama} (${item.bidang.singkatan})` : item.bidang.nama
+                    ) : (
+                      <span className="text-slate-500 italic">Belum Ditentukan</span>
+                    )}
+                  </span>
                 </td>
 
                 {/* Tanggal ND */}

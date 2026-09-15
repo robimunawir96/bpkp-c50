@@ -22,22 +22,6 @@ export default function Navbar() {
 
   return (
     <header className="sticky top-0 z-50 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 text-white shadow-xl">
-      {/* Top Banner Pemerintah / Instansi */}
-      <div className="bg-slate-950 text-slate-400 text-xs py-1.5 px-4 border-b border-slate-800/80">
-        <div className="max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-2">
-          <div className="flex items-center gap-2">
-            <span className="inline-block w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
-            <span className="font-medium text-slate-300">
-              Portal Resmi Perwakilan BPKP Provinsi Jawa Barat
-            </span>
-          </div>
-          <div className="hidden sm:flex items-center gap-4 text-[11px]">
-            <span>📞 (022) 7203323</span>
-            <span>✉️ jabar@bpkp.go.id</span>
-            <span className="text-amber-400/90 font-medium">Jl. Cikutra No. 204, Bandung</span>
-          </div>
-        </div>
-      </div>
 
       {/* Main Navbar */}
       <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">

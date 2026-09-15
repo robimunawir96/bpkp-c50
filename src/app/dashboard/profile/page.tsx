@@ -25,6 +25,9 @@ interface UserProfile {
   bidang?: string;
   bidangSingkatan?: string | null;
   bidangId?: string;
+  pendingBidangId?: string | null;
+  pendingBidangNama?: string | null;
+  pendingBidangSingkatan?: string | null;
   role: 'ADMIN' | 'PEGAWAI';
   avatarUrl?: string;
   createdAt?: string;
@@ -166,8 +169,10 @@ export default function ProfilePage() {
       }
 
       setNotification({
-        message: 'Informasi profil pegawai berhasil diperbarui!',
-        type: 'success'
+        message: data.message || (data.isPendingApproval
+          ? 'Permintaan perubahan bidang berhasil dikirim dan sedang menunggu persetujuan (approval) Administrator.'
+          : 'Informasi profil pegawai berhasil diperbarui!'),
+        type: data.isPendingApproval ? 'info' : 'success'
       });
     } catch (err) {
       console.error('Failed to update profile:', err);
@@ -421,9 +426,16 @@ export default function ProfilePage() {
 
             {/* Unit Bidang Kerja */}
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                Bidang Kerja / Unit Pengawasan
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-semibold text-slate-300">
+                  Bidang Kerja / Unit Pengawasan
+                </label>
+                {profile?.pendingBidangNama && !isAdmin && (
+                  <span className="text-[11px] text-amber-400 font-semibold bg-amber-400/10 border border-amber-400/20 px-2 py-0.5 rounded-full flex items-center gap-1 animate-pulse">
+                    <span>Menunggu Persetujuan Admin: {profile.pendingBidangNama}</span>
+                  </span>
+                )}
+              </div>
               <div className="relative">
                 <BuildingOffice2Icon className="w-4 h-4 text-slate-400 absolute left-3 top-3 pointer-events-none" />
                 <select
@@ -441,6 +453,19 @@ export default function ProfilePage() {
                   ))}
                 </select>
               </div>
+              {profile?.pendingBidangNama && !isAdmin ? (
+                <p className="text-[11px] text-amber-400/90 mt-1.5 leading-relaxed bg-amber-950/40 p-2.5 rounded-xl border border-amber-500/20">
+                  ⚠️ Anda telah mengajukan perpindahan ke bidang <strong className="text-white">{profile.pendingBidangNama}</strong>. Bidang aktif Anda tetap <strong className="text-white">{profile.bidang || '-'}</strong> sampai disetujui oleh Administrator di Manajemen Akun.
+                </p>
+              ) : isAdmin ? (
+                <p className="text-[10px] text-emerald-400/90 mt-1 flex items-center gap-1 font-medium">
+                  ✓ Sebagai Administrator, perubahan unit bidang langsung diterapkan secara otomatis tanpa perlu persetujuan.
+                </p>
+              ) : (
+                <p className="text-[10px] text-slate-400 mt-1">
+                  *Perubahan bidang kerja untuk role Pegawai akan dikirim ke Administrator untuk persetujuan (approval).
+                </p>
+              )}
             </div>
 
             {/* Action Save Button */}
