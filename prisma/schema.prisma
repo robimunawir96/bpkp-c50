@@ -1,0 +1,158 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  ADMIN
+  PEGAWAI
+}
+
+enum UserStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Bidang {
+  id          String       @id @default(uuid())
+  nama        String       // misal: Instansi Pemerintah Pusat
+  singkatan   String?      // misal: IPP, AN, APD, Investigasi
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  users       User[]
+  suratTugas  SuratTugas[]
+  notaDinas   NotaDinas[]
+  lhps        Lhp[]
+  suratPengantar SuratPengantar[]
+  kaks        Kak[]
+}
+
+model User {
+  id                    String                 @id @default(uuid())
+  email                 String                 @unique
+  passwordHash          String?
+  name                  String
+  phoneNumber           String?
+  bidangId              String?
+  bidangRef             Bidang?                @relation(fields: [bidangId], references: [id], onDelete: SetNull)
+  bidang                String?                // misal: Instansi Pemerintah Pusat (label / nama bidang)
+  role                  Role                   @default(PEGAWAI)
+  status                UserStatus             @default(APPROVED)
+  avatarUrl             String?
+  resetRequests         PasswordResetRequest[]
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+}
+
+model PasswordResetRequest {
+  id          String        @id @default(uuid())
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email       String
+  newPassword String?
+  reason      String?
+  status      RequestStatus @default(PENDING)
+  adminNotes  String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model SuratTugas {
+  id                      String    @id @default(uuid())
+  tahun                   String
+  noS                     String?
+  noST                    String?
+  bidangId                String?
+  bidang                  Bidang?   @relation(fields: [bidangId], references: [id], onDelete: SetNull)
+  tujuan                  String
+  perihal                 String
+  tanggalSurat            String?
+  tglMulai                String?
+  tglSelesai              String?
+  suratDiterimaSekretaris String?
+  linkDrive               String?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+}
+
+model NotaDinas {
+  id          String    @id @default(uuid())
+  tahun       String
+  noND        String?
+  bidangId    String?
+  bidang      Bidang?   @relation(fields: [bidangId], references: [id], onDelete: SetNull)
+  yangMeminta String
+  tanggalND   String?
+  perihal     String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Lhp {
+  id                        String    @id @default(uuid())
+  tahun                     String
+  noS                       String?
+  noLHP                     String?
+  bidangId                  String?
+  bidang                    Bidang?   @relation(fields: [bidangId], references: [id], onDelete: SetNull)
+  tanggalLHP                String?
+  tujuan                    String
+  perihal                   String
+  tanggalDiterimaSekretaris String?
+  linkDrive                 String?
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+}
+
+model SuratPengantar {
+  id              String    @id @default(uuid())
+  tahun           String
+  tanggalDibuat   String?
+  noLHP           String?
+  noSP            String?   // Nomor Surat Pengantar
+  tujuan          String    // Tujuan Penugasan
+  linkDrive       String?   // Link Dokumen Google Drive
+  bidangId        String?
+  bidang          Bidang?   @relation(fields: [bidangId], references: [id], onDelete: SetNull)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model Kak {
+  id            String            @id @default(uuid())
+  tahun         String
+  bidangId      String?
+  bidang        Bidang?           @relation(fields: [bidangId], references: [id], onDelete: SetNull)
+  tujuan        String
+  perihal       String
+  diberikanOleh String?
+  status        String            @default("Diterima Sekbid") // Diterima Sekbid, Dikirim ke Sekper, Diberikan ke Tim
+  linkDrive     String?
+  statusHistory KakStatusHistory[]
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+}
+
+model KakStatusHistory {
+  id         String   @id @default(uuid())
+  kakId      String
+  kak        Kak      @relation(fields: [kakId], references: [id], onDelete: Cascade)
+  status     String
+  tanggal    String
+  keterangan String?
+  diubahOleh String?
+  createdAt  DateTime @default(now())
+}
