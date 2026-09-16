@@ -14,7 +14,8 @@ export async function POST(req: Request) {
     }
 
     const user = await prisma.user.findUnique({
-      where: { email }
+      where: { email },
+      include: { bidangRef: true }
     });
 
     if (!user || user.passwordHash !== password) {
@@ -40,28 +41,26 @@ export async function POST(req: Request) {
       );
     }
 
-    const userWithBidang = await prisma.user.findUnique({
-      where: { id: user.id },
-      include: { bidangRef: true }
-    });
-
     return NextResponse.json({
       success: true,
       user: {
         id: user.id,
         name: user.name,
         email: user.email,
-        bidang: userWithBidang?.bidangRef?.nama || user.bidang || '',
-        bidangSingkatan: userWithBidang?.bidangRef?.singkatan || null,
-        bidangId: userWithBidang?.bidangId || '',
+        bidang: user.bidangRef?.nama || user.bidang || '',
+        bidangSingkatan: user.bidangRef?.singkatan || null,
+        bidangId: user.bidangId || '',
         role: user.role,
         status: userStatus
       }
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Login failed:', error);
+    const errorMessage = process.env.NODE_ENV === 'development' && error?.message
+      ? `Terjadi kesalahan pada server: ${error.message}`
+      : 'Terjadi kesalahan pada server saat login.';
     return NextResponse.json(
-      { error: 'Terjadi kesalahan pada server saat login.' },
+      { error: errorMessage },
       { status: 500 }
     );
   }
